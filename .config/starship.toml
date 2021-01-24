@@ -1,0 +1,15 @@
+[character]
+use_symbol_for_status = true
+error_symbol = "(>_<) ✖"
+
+[time]
+format = "%R"
+disabled = false
+
+[git_status]
+disabled = false
+
+[memory_usage]
+disabled = false
+threshold = -1
+"$symbol [${ram}]($style) "

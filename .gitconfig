@@ -1,0 +1,18 @@
+[user]
+	email = terauchi.hiroshi@cloud-ace.jp
+	name = Terauchi Hiroshi
+[credential]
+    helper = store --file ~/.git-credentials
+
+[color]
+	diff = auto
+	status = auto
+	branch = auto
+	ui = true
+
+[alias]
+    lol = log --oneline --graph
+    loa = log --oneline --graph --all
+
+[core]
+	excludesfile = /Users/terauchi.hiroshi/.gitignore_global
