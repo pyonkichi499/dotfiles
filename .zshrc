@@ -9,10 +9,13 @@ export LSCOLORS=gxfxcxdxbxegedabagacad
 alias ls="ls -G"
 alias ll="ls -GalFh"
 alias zcat='gzcat'
+alias grep="grep --color"
 
-export HISTSIZE=1000
-export SAVEHIST=100000
+export HISTSIZE=10000
+export SAVEHIST=1000000
 setopt hist_ignore_dups
+setopt share_history
+setopt extended_history
 
 export PATH=/usr/local/bin:$PATH
 
@@ -41,3 +44,28 @@ if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc' ]; the
 
 # The next line enables shell command completion for gcloud.
 if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
+
+autoload -U +X bashcompinit && bashcompinit
+complete -o nospace -C /usr/local/bin/terraform terraform
+export PATH=/Users/terauchi.hiroshi/.nodebrew/current/bin:$PATH
+
+if [ -e ~/.zsh/completions ]; then
+    fpath=(~/.zsh/completions $fpath)
+fi
+
+autoload -Uz compinit
+compinit
+
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+export FZF_COMPLETION_TRIGGER="," # default: '**'
+source ~/.github/kwhrtsk/docker-fzf-completion/docker-fzf.zsh
+
+# go path
+export GOPATH=$HOME/go
+export GOROOT="$(brew --prefix golang)/libexec"
+export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
+
+# jenv path
+export PATH="$HONE/.jenv/bin:$PATH"
+eval "$(jenv init -)"
+export PATH="/usr/local/opt/ncurses/bin:$PATH"

@@ -15,4 +15,9 @@
     loa = log --oneline --graph --all
 
 [core]
-	excludesfile = /Users/terauchi.hiroshi/.gitignore_global
+	excludesFile = /Users/terauchi.hiroshi/.gitignore_global
+[filter "lfs"]
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f
