@@ -1,23 +1,24 @@
 [user]
-	email = terauchi.hiroshi@cloud-ace.jp
-	name = Terauchi Hiroshi
+    email = terauchi.hiroshi@cloud-ace.jp
+    name = Terauchi Hiroshi
 [credential]
     helper = store --file ~/.git-credentials
 
 [color]
-	diff = auto
-	status = auto
-	branch = auto
-	ui = true
+    diff = auto
+    status = auto
+    branch = auto
+    ui = true
 
 [alias]
     lol = log --oneline --graph
     loa = log --oneline --graph --all
+    st = status -sb
 
 [core]
-	excludesFile = /Users/terauchi.hiroshi/.gitignore_global
+    excludesFile = /Users/terauchi.hiroshi/.gitignore_global
 [filter "lfs"]
-	process = git-lfs filter-process
-	required = true
-	clean = git-lfs clean -- %f
-	smudge = git-lfs smudge -- %f
+    process = git-lfs filter-process
+    required = true
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
