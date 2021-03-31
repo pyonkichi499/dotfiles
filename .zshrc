@@ -2,6 +2,8 @@ export PS1="%T %/ %# "$'\n'"> "
 eval "$(starship init zsh)"
 
 setopt no_beep
+
+fpath=(~/.zsh/completion $fpath)
 autoload -U compinit
 compinit
 
