@@ -4,8 +4,8 @@ eval "$(starship init zsh)"
 setopt no_beep
 
 fpath=(~/.zsh/completion $fpath)
-autoload -U compinit
-compinit
+autoload -U compinit && compinit
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
 export LSCOLORS=gxfxcxdxbxegedabagacad
 alias ls="ls -G"
@@ -38,6 +38,8 @@ unset __conda_setup
 
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
+eval "$(pyenv init --path)"
+
 eval "$(pyenv init -)"
 setopt nonomatch
 
@@ -67,7 +69,55 @@ export GOPATH=$HOME/go
 export GOROOT="$(brew --prefix golang)/libexec"
 export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
 
+# goenv path
+export GOENV_ROOT=$HOME/.goenv
+export PATH=$GOENV_ROOT/bin:$PATH
+export PATH=$HOME/.goenv/bin:$PATH
+eval "$(goenv init -)"
+
 # jenv path
 export PATH="$HONE/.jenv/bin:$PATH"
 eval "$(jenv init -)"
 export PATH="/usr/local/opt/ncurses/bin:$PATH"
+
+# Add Visual Studio Code (code)
+export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
+
+export JAVA_HOME=/Users/terauchi.hiroshi/Library/Java/JavaVirtualMachines/adopt-openjdk-11.0.11/Contents/Home
+
+export EDITOR=zsh
+eval "$(direnv hook zsh)"
+
+# locale
+export LC_ALL=en-US.UTF-8
+export LANG=ja-JP.UTF-8
+
+# activate venv
+function cd() {
+    builtin cd "$@"
+
+    ## Default path to virtualenv in your projects
+    DEFAULT_ENV_PATH="./venv"
+
+    ## If env folder is found then activate the vitualenv
+    function activate_venv() {
+        if [[ -f "${DEFAULT_ENV_PATH}/bin/activate" ]]; then
+            source "${DEFAULT_ENV_PATH}/bin/activate"
+            echo "Activating ${VIRTUAL_ENV}"
+        fi
+    }
+
+    if [[ -z "$VIRTUAL_ENV" ]]; then
+        activate_venv
+    else
+        ## check the current folder belong to earlier VIRTUAL_ENV folder
+        # if yes then do nothing
+        # else deactivate then run a new env folder check
+        parentdir="$(dirname ${VIRTUAL_ENV})"
+        if [[ "$PWD"/ != "$parentdir"/* ]]; then
+            echo "Deactivating ${VIRTUAL_ENV}"
+            deactivate
+            activate_venv
+        fi
+    fi
+}

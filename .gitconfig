@@ -22,3 +22,7 @@
     required = true
     clean = git-lfs clean -- %f
     smudge = git-lfs smudge -- %f
+[credential "https://source.developers.google.com"]
+	helper = gcloud.sh
+[http]
+	cookiefile = /Users/terauchi.hiroshi/.gitcookies
