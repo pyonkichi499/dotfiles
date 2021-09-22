@@ -1,6 +1,6 @@
 [user]
-    email = terauchi.hiroshi@cloud-ace.jp
-    name = Terauchi Hiroshi
+	email = terauchi.hiroshi@cloud-ace.jp
+	name = terauchi hiroshi
 [credential]
     helper = store --file ~/.git-credentials
 

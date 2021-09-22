@@ -1,0 +1,9 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = true
+[remote "origin"]
+	url = https://github.com/t-hiroshi/dotfiles.git
+[remote "hiroshi"]
+	url = https://github.com/pyonkichi499/dotfiles.git
+	fetch = +refs/heads/*:refs/remotes/hiroshi/*
