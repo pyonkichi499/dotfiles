@@ -1,6 +1,12 @@
 [character]
 error_symbol = "[\\(>_<\\) ✖](bold red)"
 
+[directory]
+truncation_length = 5
+
+[hostname]
+disabled = true
+
 [time]
 format = "[$time ]($style)"
 style = "bold yellow"
@@ -18,3 +24,6 @@ style = "bold white"
 
 [gcloud]
 format = '[$symbol$project]($style) '
+
+[username]
+disabled = true
