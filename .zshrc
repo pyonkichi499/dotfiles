@@ -68,7 +68,7 @@ export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
 export GOENV_ROOT=$HOME/.goenv
 export PATH=$GOENV_ROOT/bin:$PATH
 export PATH=$HOME/.goenv/bin:$PATH
-eval "$(goenv init -)"
+# eval "$(goenv init -)"
 
 # jenv path
 export PATH="$HONE/.jenv/bin:$PATH"
@@ -118,3 +118,8 @@ function cd() {
 }
 [ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
 export PATH="/usr/local/sbin:$PATH"
+
+
+if (which zprof > /dev/null 2>&1) ;then
+  zprof
+fi
