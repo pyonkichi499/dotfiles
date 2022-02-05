@@ -19,6 +19,8 @@ setopt hist_ignore_dups
 setopt share_history
 setopt extended_history
 
+export DOCKER_HOST=ssh://localhost:60006
+
 export PATH=/usr/local/bin:$PATH
 
 # >>> conda initialize >>>
@@ -53,13 +55,6 @@ autoload -U +X bashcompinit && bashcompinit
 complete -o nospace -C /usr/local/bin/terraform terraform
 export PATH=/Users/terauchi.hiroshi/.nodebrew/current/bin:$PATH
 
-if [ -e ~/.zsh/completions ]; then
-    fpath=(~/.zsh/completions $fpath)
-fi
-
-autoload -Uz compinit
-compinit
-
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export FZF_COMPLETION_TRIGGER="," # default: '**'
 source ~/.github/kwhrtsk/docker-fzf-completion/docker-fzf.zsh
@@ -89,8 +84,8 @@ export EDITOR=zsh
 eval "$(direnv hook zsh)"
 
 # locale
-export LC_ALL=en-US.UTF-8
-export LANG=ja-JP.UTF-8
+export LC_ALL=en_US.UTF-8
+export LANG=ja_JP.UTF-8
 
 # activate venv
 function cd() {
@@ -121,3 +116,5 @@ function cd() {
         fi
     fi
 }
+[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
+export PATH="/usr/local/sbin:$PATH"
