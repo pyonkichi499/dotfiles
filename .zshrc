@@ -19,7 +19,8 @@ setopt hist_ignore_dups
 setopt share_history
 setopt extended_history
 
-export DOCKER_HOST=ssh://localhost:60006
+# set docker host
+export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
 
 export PATH=/usr/local/bin:$PATH
 
