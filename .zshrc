@@ -1,6 +1,11 @@
 export PS1="%T %/ %# "$'\n'"> "
 eval "$(starship init zsh)"
 
+# set option+arrow to move / word
+bindkey -e
+bindkey '\e\e[C' forward-word
+bindkey '\e\e[D' backward-word
+
 setopt no_beep
 
 fpath=(~/.zsh/completion $fpath)
