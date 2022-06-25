@@ -8,7 +8,7 @@ autoload -U compinit && compinit
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
 export LSCOLORS=gxfxcxdxbxegedabagacad
-alias ls="ls -G"
+alias ls="ls -G --color=auto"
 alias ll="ls -GalFh"
 alias zcat='gzcat'
 alias grep="grep --color"
