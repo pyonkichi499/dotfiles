@@ -1,5 +1,9 @@
-export PS1="%T %/ %# "$'\n'"> "
 eval "$(starship init zsh)"
+
+# set option+arrow to move / word
+bindkey -e
+bindkey '\e\e[C' forward-word
+bindkey '\e\e[D' backward-word
 
 setopt no_beep
 
@@ -8,16 +12,22 @@ autoload -U compinit && compinit
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
 export LSCOLORS=gxfxcxdxbxegedabagacad
-alias ls="ls -G --color=auto"
+
+alias ls="ls --color=auto"
 alias ll="ls -GalFh"
 alias zcat='gzcat'
 alias grep="grep --color"
+
+alias docker-compose="docker compose"
 
 export HISTSIZE=10000
 export SAVEHIST=1000000
 setopt hist_ignore_dups
 setopt share_history
 setopt extended_history
+
+# set docker host
+export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
 
 export PATH=/usr/local/bin:$PATH
 
@@ -53,13 +63,6 @@ autoload -U +X bashcompinit && bashcompinit
 complete -o nospace -C /usr/local/bin/terraform terraform
 export PATH=/Users/terauchi.hiroshi/.nodebrew/current/bin:$PATH
 
-if [ -e ~/.zsh/completions ]; then
-    fpath=(~/.zsh/completions $fpath)
-fi
-
-autoload -Uz compinit
-compinit
-
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export FZF_COMPLETION_TRIGGER="," # default: '**'
 source ~/.github/kwhrtsk/docker-fzf-completion/docker-fzf.zsh
@@ -73,7 +76,7 @@ export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
 export GOENV_ROOT=$HOME/.goenv
 export PATH=$GOENV_ROOT/bin:$PATH
 export PATH=$HOME/.goenv/bin:$PATH
-eval "$(goenv init -)"
+# eval "$(goenv init -)"
 
 # jenv path
 export PATH="$HONE/.jenv/bin:$PATH"
@@ -89,8 +92,8 @@ export EDITOR=zsh
 eval "$(direnv hook zsh)"
 
 # locale
-export LC_ALL=en-US.UTF-8
-export LANG=ja-JP.UTF-8
+export LC_ALL=en_US.UTF-8
+export LANG=ja_JP.UTF-8
 
 # activate venv
 function cd() {
@@ -121,3 +124,20 @@ function cd() {
         fi
     fi
 }
+[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
+export PATH="/usr/local/sbin:$PATH"
+
+
+if (which zprof > /dev/null 2>&1) ;then
+  zprof
+fi
+export PATH="$HOME/.plenv/bin:$PATH"
+eval "$(plenv init -)"
+
+eval "$(anyenv init -)"
+
+# Created by `pipx` on 2022-05-01 12:10:23
+export PATH="$PATH:/Users/terauchi.hiroshi/.local/bin"
+# START: Added by Updated Airflow Breeze autocomplete setup
+source /Users/terauchi.hiroshi/work/practice/sandbox/airflow_tmp/dev/breeze/autocomplete/breeze-complete-zsh.sh
+# END: Added by Updated Airflow Breeze autocomplete setup
