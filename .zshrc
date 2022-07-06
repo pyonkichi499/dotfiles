@@ -1,4 +1,3 @@
-export PS1="%T %/ %# "$'\n'"> "
 eval "$(starship init zsh)"
 
 # set option+arrow to move / word
@@ -13,10 +12,12 @@ autoload -U compinit && compinit
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
 export LSCOLORS=gxfxcxdxbxegedabagacad
-alias ls="ls -G"
+alias ls="ls --color=auto"
 alias ll="ls -GalFh"
 alias zcat='gzcat'
 alias grep="grep --color"
+
+alias docker-compose="docker compose"
 
 export HISTSIZE=10000
 export SAVEHIST=1000000
@@ -129,3 +130,13 @@ export PATH="/usr/local/sbin:$PATH"
 if (which zprof > /dev/null 2>&1) ;then
   zprof
 fi
+export PATH="$HOME/.plenv/bin:$PATH"
+eval "$(plenv init -)"
+
+eval "$(anyenv init -)"
+
+# Created by `pipx` on 2022-05-01 12:10:23
+export PATH="$PATH:/Users/terauchi.hiroshi/.local/bin"
+# START: Added by Updated Airflow Breeze autocomplete setup
+source /Users/terauchi.hiroshi/work/practice/sandbox/airflow_tmp/dev/breeze/autocomplete/breeze-complete-zsh.sh
+# END: Added by Updated Airflow Breeze autocomplete setup

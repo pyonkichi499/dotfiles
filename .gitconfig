@@ -18,6 +18,7 @@
 [core]
     excludesFile = /Users/terauchi.hiroshi/.gitignore_global
 	quotepath = false
+	editor = code --wait
 [filter "lfs"]
     process = git-lfs filter-process
     required = true
