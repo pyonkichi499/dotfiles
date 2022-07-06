@@ -139,5 +139,5 @@ eval "$(anyenv init -)"
 # Created by `pipx` on 2022-05-01 12:10:23
 export PATH="$PATH:/Users/terauchi.hiroshi/.local/bin"
 # START: Added by Updated Airflow Breeze autocomplete setup
-source /Users/terauchi.hiroshi/work/practice/sandbox/airflow_tmp/dev/breeze/autocomplete/breeze-complete-zsh.sh
+# source /Users/terauchi.hiroshi/work/practice/sandbox/airflow_tmp/dev/breeze/autocomplete/breeze-complete-zsh.sh
 # END: Added by Updated Airflow Breeze autocomplete setup
