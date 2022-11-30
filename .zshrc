@@ -26,6 +26,8 @@ setopt hist_ignore_dups
 setopt share_history
 setopt extended_history
 
+alias history='history -t "%F %T"'
+
 # set docker host
 export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
 
@@ -126,7 +128,11 @@ function cd() {
 }
 [ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
 export PATH="/usr/local/sbin:$PATH"
-
+# alias haskell-stack
+alias ghc='stack ghc --'
+alias ghci='stack ghci --'
+alias runghc='stack runghc --'
+alias runhaskell='stack runhaskell --'
 
 if (which zprof > /dev/null 2>&1) ;then
   zprof
