@@ -189,3 +189,21 @@ function peco-cdr () {
 }
 zle -N peco-cdr
 bindkey '^G' peco-cdr
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
+
+
+# switch between m2 to rosetta
+alias x86='arch -x86_64 zsh'
+alias arm='arch -arm64e zsh'
+
+if [ "$(uname -m)" = "arm64" ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv)"
+  export PATH="/opt/homebrew/bin:$PATH"
+else
+  eval "$(/usr/local/bin/brew shellenv)"
+fi

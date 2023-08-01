@@ -30,3 +30,9 @@ disabled = true
 
 [docker_context]
 disabled = true
+
+[custom.arch]
+command = "uname -m"
+when = """ test $(uname -m) = "x86_64" """
+style = "bold yellow"
+format = "on [$output]($style) "
