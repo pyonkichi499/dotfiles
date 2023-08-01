@@ -51,17 +51,15 @@ export PATH=/usr/local/bin:$PATH
 # # <<< conda initialize <<<
 
 export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)" # これを追記
-# eval "$(pyenv init)"
+export PATH="$PYENV_ROOT/shims:$PATH"
+eval "$(pyenv init --path)"
+eval "$(pyenv init -)"
+export LDFLAGS="-L/opt/homebrew/opt/zlib/lib"
+export CPPFLAGS="-I/opt/homebrew/opt/zlib/include"
+export PKG_CONFIG_PATH="/opt/homebrew/opt/zlib/lib/pkgconfig"
+
 
 setopt nonomatch
-
-# The next line updates PATH for the Google Cloud SDK.
-if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc'; fi
-
-# The next line enables shell command completion for gcloud.
-if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
 
 autoload -U +X bashcompinit && bashcompinit
 complete -o nospace -C /usr/local/bin/terraform terraform
