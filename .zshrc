@@ -29,7 +29,8 @@ setopt extended_history
 alias history='history -t "%F %T"'
 
 # set docker host
-export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
+# limactl was uninstalled
+# export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
 
 export PATH=/usr/local/bin:$PATH
 
@@ -50,9 +51,9 @@ unset __conda_setup
 
 export PYENV_ROOT="$HOME/.pyenv"
 export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init --path)"
+eval "$(pyenv init --path)" # これを追記
+# eval "$(pyenv init)"
 
-eval "$(pyenv init -)"
 setopt nonomatch
 
 # The next line updates PATH for the Google Cloud SDK.
@@ -126,7 +127,7 @@ function cd() {
         fi
     fi
 }
-[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
+#[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
 export PATH="/usr/local/sbin:$PATH"
 # alias haskell-stack
 alias ghc='stack ghc --'
@@ -147,3 +148,44 @@ export PATH="$PATH:/Users/terauchi.hiroshi/.local/bin"
 # START: Added by Updated Airflow Breeze autocomplete setup
 # source /Users/terauchi.hiroshi/work/practice/sandbox/airflow_tmp/dev/breeze/autocomplete/breeze-complete-zsh.sh
 # END: Added by Updated Airflow Breeze autocomplete setup
+
+
+### MANAGED BY RANCHER DESKTOP START (DO NOT EDIT)
+export PATH="/Users/terauchi.hiroshi/.rd/bin:$PATH"
+### MANAGED BY RANCHER DESKTOP END (DO NOT EDIT)
+[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
+
+# gcloud
+# Use a python you have installed in a special location
+export CLOUDSDK_PYTHON=/Users/terauchi.hiroshi/.pyenv/versions/3.8.16/bin/python
+
+# cdr
+if [[ -n $(echo ${^fpath}/chpwd_recent_dirs(N)) && -n $(echo ${^fpath}/cdr(N)) ]]; then
+    autoload -Uz chpwd_recent_dirs cdr add-zsh-hook
+    add-zsh-hook chpwd chpwd_recent_dirs
+    zstyle ':completion:*' recent-dirs-insert both
+    zstyle ':chpwd:*' recent-dirs-default true
+    zstyle ':chpwd:*' recent-dirs-max 1000
+    zstyle ':chpwd:*' recent-dirs-file "$HOME/.cache/chpwd-recent-dirs"
+fi
+
+# peco-functions
+# function peco-history-selection() {
+#     BUFFER=`history -n 1 | cut -d" " -f5- | tac | awk '!a[$0]++' | peco`
+#     CURSOR=$#BUFFER
+#     zle reset-prompt
+# }
+
+# zle -N peco-history-selection
+# bindkey '^R' peco-history-selection
+
+function peco-cdr () {
+  local selected_dir="$(cdr -l | sed 's/^[0-9]\+ \+//' | peco --prompt="cdr >" --query "$LBUFFER")"
+  if [ -n "$selected_dir" ]; then
+    BUFFER="cd `echo $selected_dir | awk '{print$2}'`"
+    CURSOR=$#BUFFER
+    zle reset-prompt
+  fi
+}
+zle -N peco-cdr
+bindkey '^G' peco-cdr
