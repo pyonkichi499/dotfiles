@@ -7,4 +7,4 @@ ln -sf ~/dotfiles/.gitconfig ~/.gitconfig
 ln -sf ~/dotfiles/.tmux.conf ~/.tmux.conf
 ln -sf ~/dotfiles/.config/starship.toml ~/.config/starship.toml
 ln -sf ~/dotfiles/.customize_environment ~/.customize_environment
-ln -sf ~/dotfiles/.ssh.config ~/.ssh.config
+ln -sf ~/dotfiles/.ssh/config ~/.ssh/config
