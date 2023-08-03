@@ -24,7 +24,6 @@ style = "bold white"
 
 [gcloud]
 # TDOO: default なら表示消したい
-when = """ test $active != "default" """
 format = '[$symbol$project]($style) as [$active](bold yellow) '
 
 [username]
