@@ -206,3 +206,6 @@ if [ "$(uname -m)" = "arm64" ]; then
 else
   eval "$(/usr/local/bin/brew shellenv)"
 fi
+
+# path for rye
+ source "$HOME/.rye/env"
