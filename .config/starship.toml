@@ -26,6 +26,9 @@ style = "bold white"
 # TDOO: default なら表示消したい
 format = '[$symbol$project]($style) as [$active](bold yellow) '
 
+[aws]
+disabled = true
+
 [username]
 disabled = true
 
