@@ -16,7 +16,7 @@
     st = status -sb
 
 [core]
-    excludesFile = /Users/terauchi.hiroshi/.gitignore_global
+	excludesfile = /Users/terauchi.hiroshi/.gitignore
 	quotepath = false
 	editor = code --wait
 [filter "lfs"]
