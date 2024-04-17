@@ -1,5 +1,3 @@
-eval "$(starship init zsh)"
-
 # set option+arrow to move / word
 bindkey -e
 bindkey '\e\e[C' forward-word
@@ -78,7 +76,7 @@ export PATH="$PATH:${GOPATH}/bin:${GOROOT}/bin"
 export GOENV_ROOT=$HOME/.goenv
 export PATH=$GOENV_ROOT/bin:$PATH
 export PATH=$HOME/.goenv/bin:$PATH
-# eval "$(goenv init -)"
+eval "$(goenv init -)"
 
 # jenv path
 export PATH="$HONE/.jenv/bin:$PATH"
@@ -126,7 +124,6 @@ function cd() {
         fi
     fi
 }
-#[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
 export PATH="/usr/local/sbin:$PATH"
 # alias haskell-stack
 alias ghc='stack ghc --'
@@ -152,7 +149,6 @@ export PATH="$PATH:/Users/terauchi.hiroshi/.local/bin"
 ### MANAGED BY RANCHER DESKTOP START (DO NOT EDIT)
 export PATH="/Users/terauchi.hiroshi/.rd/bin:$PATH"
 ### MANAGED BY RANCHER DESKTOP END (DO NOT EDIT)
-[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && source "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-env
 
 # gcloud
 # Use a python you have installed in a special location
@@ -209,3 +205,14 @@ fi
 
 # path for rye
  source "$HOME/.rye/env"
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
+
+[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && . "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-envexport PATH="/usr/local/opt/openjdk/bin:$PATH"
+export CPPFLAGS="-I/usr/local/opt/openjdk/include"
+export PATH="/usr/local/opt/openjdk/bin:$PATH"
+export CPPFLAGS="-I/usr/local/opt/openjdk/include"
+
+# starship
+eval "$(starship init zsh)"
