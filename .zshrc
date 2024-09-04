@@ -99,34 +99,36 @@ export LC_ALL=en_US.UTF-8
 export LANG=ja_JP.UTF-8
 
 # activate venv
-function cd() {
-    builtin cd "$@"
+# 環境 activate するときは明示的にやってるので、一旦消す
+# function cd() {
+#     builtin cd "$@"
 
-    ## Default path to virtualenv in your projects
-    DEFAULT_ENV_PATH="./venv"
+#     ## Default path to virtualenv in your projects
+#     DEFAULT_ENV_PATH="./venv"
 
-    ## If env folder is found then activate the vitualenv
-    function activate_venv() {
-        if [[ -f "${DEFAULT_ENV_PATH}/bin/activate" ]]; then
-            source "${DEFAULT_ENV_PATH}/bin/activate"
-            echo "Activating ${VIRTUAL_ENV}"
-        fi
-    }
+#     ## If env folder is found then activate the vitualenv
+#     function activate_venv() {
+#         if [[ -f "${DEFAULT_ENV_PATH}/bin/activate" ]]; then
+#             source "${DEFAULT_ENV_PATH}/bin/activate"
+#             echo "Activating ${VIRTUAL_ENV}"
+#         fi
+#     }
 
-    if [[ -z "$VIRTUAL_ENV" ]]; then
-        activate_venv
-    else
-        ## check the current folder belong to earlier VIRTUAL_ENV folder
-        # if yes then do nothing
-        # else deactivate then run a new env folder check
-        parentdir="$(dirname ${VIRTUAL_ENV})"
-        if [[ "$PWD"/ != "$parentdir"/* ]]; then
-            echo "Deactivating ${VIRTUAL_ENV}"
-            deactivate
-            activate_venv
-        fi
-    fi
-}
+#     if [[ -z "$VIRTUAL_ENV" ]]; then
+#         activate_venv
+#     else
+#         ## check the current folder belong to earlier VIRTUAL_ENV folder
+#         # if yes then do nothing
+#         # else deactivate then run a new env folder check
+#         parentdir="$(dirname ${VIRTUAL_ENV})"
+#         if [[ "$PWD"/ != "$parentdir"/* ]]; then
+#             echo "Deactivating ${VIRTUAL_ENV}"
+#             deactivate
+#             activate_venv
+#         fi
+#     fi
+# }
+
 export PATH="/usr/local/sbin:$PATH"
 # alias haskell-stack
 alias ghc='stack ghc --'
@@ -177,16 +179,17 @@ fi
 # zle -N peco-history-selection
 # bindkey '^R' peco-history-selection
 
-function peco-cdr () {
-  local selected_dir="$(cdr -l | sed 's/^[0-9]\+ \+//' | peco --prompt="cdr >" --query "$LBUFFER")"
-  if [ -n "$selected_dir" ]; then
-    BUFFER="cd `echo $selected_dir | awk '{print$2}'`"
-    CURSOR=$#BUFFER
-    zle reset-prompt
-  fi
-}
-zle -N peco-cdr
-bindkey '^G' peco-cdr
+# peco は今使ってない
+# function peco-cdr () {
+#   local selected_dir="$(cdr -l | sed 's/^[0-9]\+ \+//' | peco --prompt="cdr >" --query "$LBUFFER")"
+#   if [ -n "$selected_dir" ]; then
+#     BUFFER="cd `echo $selected_dir | awk '{print$2}'`"
+#     CURSOR=$#BUFFER
+#     zle reset-prompt
+#   fi
+# }
+# zle -N peco-cdr
+# bindkey '^G' peco-cdr
 
 # The next line updates PATH for the Google Cloud SDK.
 if [ -f '$HOME/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc'; fi
