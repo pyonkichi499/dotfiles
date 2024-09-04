@@ -8,6 +8,8 @@ setopt no_beep
 fpath=(~/.zsh/completion $fpath)
 autoload -U compinit && compinit
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+complete -o nospace -C /usr/local/bin/terraform terraform
+
 
 export LSCOLORS=gxfxcxdxbxegedabagacad
 
