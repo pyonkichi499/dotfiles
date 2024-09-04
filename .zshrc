@@ -64,7 +64,7 @@ setopt nonomatch
 
 autoload -U +X bashcompinit && bashcompinit
 complete -o nospace -C /usr/local/bin/terraform terraform
-export PATH=/Users/terauchi.hiroshi/.nodebrew/current/bin:$PATH
+export PATH=$HOME/.nodebrew/current/bin:$PATH
 
 [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
 export FZF_COMPLETION_TRIGGER="," # default: '**'
@@ -89,7 +89,7 @@ export PATH="/usr/local/opt/ncurses/bin:$PATH"
 # Add Visual Studio Code (code)
 export PATH="$PATH:/Applications/Visual Studio Code.app/Contents/Resources/app/bin"
 
-export JAVA_HOME=/Users/terauchi.hiroshi/Library/Java/JavaVirtualMachines/adopt-openjdk-11.0.11/Contents/Home
+export JAVA_HOME=$HOME/Library/Java/JavaVirtualMachines/adopt-openjdk-11.0.11/Contents/Home
 
 export EDITOR=zsh
 eval "$(direnv hook zsh)"
@@ -143,7 +143,7 @@ eval "$(plenv init -)"
 eval "$(anyenv init -)"
 
 # Created by `pipx` on 2022-05-01 12:10:23
-export PATH="$PATH:/Users/terauchi.hiroshi/.local/bin"
+export PATH="$PATH:$HOME/.local/bin"
 # START: Added by Updated Airflow Breeze autocomplete setup
 # source /Users/terauchi.hiroshi/work/practice/sandbox/airflow_tmp/dev/breeze/autocomplete/breeze-complete-zsh.sh
 # END: Added by Updated Airflow Breeze autocomplete setup
@@ -189,10 +189,10 @@ zle -N peco-cdr
 bindkey '^G' peco-cdr
 
 # The next line updates PATH for the Google Cloud SDK.
-if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc'; fi
+if [ -f '$HOME/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc'; fi
 
 # The next line enables shell command completion for gcloud.
-if [ -f '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
+if [ -f '$HOME/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
 
 
 # switch between m2 to rosetta
@@ -212,8 +212,8 @@ fi
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 
 
-[ -f "/Users/terauchi.hiroshi/.ghcup/env" ] && . "/Users/terauchi.hiroshi/.ghcup/env" # ghcup-envexport PATH="/usr/local/opt/openjdk/bin:$PATH"
-export CPPFLAGS="-I/usr/local/opt/openjdk/include"
+[ -f "$HOME/.ghcup/env" ] && . "$HOME/.ghcup/env" # ghcup-envexport PATH="/usr/local/opt/openjdk/bin:$PATH"
+export CPPFLAGS="-I/usr/localopt/openjdk/include"
 export PATH="/usr/local/opt/openjdk/bin:$PATH"
 export CPPFLAGS="-I/usr/local/opt/openjdk/include"
 
