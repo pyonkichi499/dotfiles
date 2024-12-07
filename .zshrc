@@ -15,10 +15,11 @@ export LSCOLORS=gxfxcxdxbxegedabagacad
 
 alias ls="ls --color=auto"
 alias ll="ls -GalFh"
-alias zcat='gzcat'
 alias grep="grep --color"
+alias zcat='gzcat'
 
 alias docker-compose="docker compose"
+alias history='history -t "%F %T"'
 
 export HISTSIZE=10000
 export SAVEHIST=1000000
