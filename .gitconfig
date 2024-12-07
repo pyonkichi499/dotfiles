@@ -1,6 +1,7 @@
 [user]
 	email = terauchi.hiroshi@cloud-ace.jp
 	name = terauchi hiroshi
+	signingkey = AFD79AE532D0D811
 [credential]
     helper = store --file ~/.git-credentials
 
@@ -28,3 +29,7 @@
 	helper = gcloud.sh
 [http]
 	cookiefile = /Users/terauchi.hiroshi/.gitcookies
+[commit]
+	gpgsign = true
+[tag]
+	gpgSign = true
