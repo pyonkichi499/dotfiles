@@ -27,29 +27,8 @@ setopt hist_ignore_dups
 setopt share_history
 setopt extended_history
 
-alias history='history -t "%F %T"'
-
-# set docker host
-# limactl was uninstalled
-# export DOCKER_HOST=$(limactl list docker --format 'unix://{{.Dir}}/sock/docker.sock')
 
 export PATH=/usr/local/bin:$PATH
-
-# anaconda 使いたくないので消しておく
-# # >>> conda initialize >>>
-# # !! Contents within this block are managed by 'conda init' !!
-# __conda_setup="$('/Users/terauchi.hiroshi/anaconda3/bin/conda' 'shell.zsh' 'hook' 2>/dev/null)"
-# if [ $? -eq 0 ]; then
-#     eval "$__conda_setup"
-# else
-#     if [ -f "/Users/terauchi.hiroshi/anaconda3/etc/profile.d/conda.sh" ]; then
-#         . "/Users/terauchi.hiroshi/anaconda3/etc/profile.d/conda.sh"
-#     else
-#         export PATH="/Users/terauchi.hiroshi/anaconda3/bin:$PATH"
-#     fi
-# fi
-# unset __conda_setup
-# # <<< conda initialize <<<
 
 # TODO: 将来 rye で管理するなら pyenv は消す
 export PYENV_ROOT="$HOME/.pyenv"
@@ -99,37 +78,6 @@ eval "$(direnv hook zsh)"
 export LC_ALL=en_US.UTF-8
 export LANG=ja_JP.UTF-8
 
-# activate venv
-# 環境 activate するときは明示的にやってるので、一旦消す
-# function cd() {
-#     builtin cd "$@"
-
-#     ## Default path to virtualenv in your projects
-#     DEFAULT_ENV_PATH="./venv"
-
-#     ## If env folder is found then activate the vitualenv
-#     function activate_venv() {
-#         if [[ -f "${DEFAULT_ENV_PATH}/bin/activate" ]]; then
-#             source "${DEFAULT_ENV_PATH}/bin/activate"
-#             echo "Activating ${VIRTUAL_ENV}"
-#         fi
-#     }
-
-#     if [[ -z "$VIRTUAL_ENV" ]]; then
-#         activate_venv
-#     else
-#         ## check the current folder belong to earlier VIRTUAL_ENV folder
-#         # if yes then do nothing
-#         # else deactivate then run a new env folder check
-#         parentdir="$(dirname ${VIRTUAL_ENV})"
-#         if [[ "$PWD"/ != "$parentdir"/* ]]; then
-#             echo "Deactivating ${VIRTUAL_ENV}"
-#             deactivate
-#             activate_venv
-#         fi
-#     fi
-# }
-
 export PATH="/usr/local/sbin:$PATH"
 # alias haskell-stack
 alias ghc='stack ghc --'
@@ -169,28 +117,6 @@ if [[ -n $(echo ${^fpath}/chpwd_recent_dirs(N)) && -n $(echo ${^fpath}/cdr(N)) ]
     zstyle ':chpwd:*' recent-dirs-max 1000
     zstyle ':chpwd:*' recent-dirs-file "$HOME/.cache/chpwd-recent-dirs"
 fi
-
-# peco-functions
-# function peco-history-selection() {
-#     BUFFER=`history -n 1 | cut -d" " -f5- | tac | awk '!a[$0]++' | peco`
-#     CURSOR=$#BUFFER
-#     zle reset-prompt
-# }
-
-# zle -N peco-history-selection
-# bindkey '^R' peco-history-selection
-
-# peco は今使ってない
-# function peco-cdr () {
-#   local selected_dir="$(cdr -l | sed 's/^[0-9]\+ \+//' | peco --prompt="cdr >" --query "$LBUFFER")"
-#   if [ -n "$selected_dir" ]; then
-#     BUFFER="cd `echo $selected_dir | awk '{print$2}'`"
-#     CURSOR=$#BUFFER
-#     zle reset-prompt
-#   fi
-# }
-# zle -N peco-cdr
-# bindkey '^G' peco-cdr
 
 # The next line updates PATH for the Google Cloud SDK.
 if [ -f '$HOME/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc'; fi
