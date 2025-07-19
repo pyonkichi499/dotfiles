@@ -1,7 +1,7 @@
 [user]
 	email = terauchi.hiroshi@cloud-ace.jp
 	name = terauchi hiroshi
-	signingkey = AFD79AE532D0D811
+	signingkey = 2F0D81F32A9C1678
 [credential]
     helper = store --file ~/.git-credentials
 
@@ -19,7 +19,7 @@
 [core]
 	excludesfile = /Users/terauchi.hiroshi/.gitignore
 	quotepath = false
-	editor = code --wait
+	editor = cursor --wait
 [filter "lfs"]
     process = git-lfs filter-process
     required = true
@@ -33,3 +33,5 @@
 	gpgsign = true
 [tag]
 	gpgSign = true
+[init]
+	defaultBranch = main
