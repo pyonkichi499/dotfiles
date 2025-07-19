@@ -8,6 +8,8 @@ setopt no_beep
 fpath=(~/.zsh/completion $fpath)
 autoload -U compinit && compinit
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
+ # rye run python の後にファイル補完 (_files) を有効にする
+compdef _files rye run python
 complete -o nospace -C /usr/local/bin/terraform terraform
 
 
