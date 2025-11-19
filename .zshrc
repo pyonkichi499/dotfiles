@@ -108,7 +108,7 @@ export PATH="/Users/terauchi.hiroshi/.rd/bin:$PATH"
 
 # gcloud
 # Use a python you have installed in a special location
-export CLOUDSDK_PYTHON=$HOME/.pyenv/versions/3.12.11/bin/python
+export CLOUDSDK_PYTHON=$HOME/.pyenv/versions/3.13.9/bin/python
 
 # cdr
 if [[ -n $(echo ${^fpath}/chpwd_recent_dirs(N)) && -n $(echo ${^fpath}/cdr(N)) ]]; then
