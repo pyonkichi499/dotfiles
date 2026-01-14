@@ -155,3 +155,6 @@ export CPPFLAGS="-I/usr/local/opt/openjdk/include"
 
 # starship
 eval "$(starship init zsh)"
+
+# fnm for node version management``
+eval "$(fnm env --use-on-cd)"
