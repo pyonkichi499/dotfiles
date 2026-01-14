@@ -34,9 +34,13 @@ export PATH=/usr/local/bin:$PATH
 
 # TODO: 将来 rye で管理するなら pyenv は消す
 export PYENV_ROOT="$HOME/.pyenv"
-export PATH="$PYENV_ROOT/shims:$PATH"
-eval "$(pyenv init --path)"
-eval "$(pyenv init -)"
+# pyenv の bin ディレクトリを PATH に追加（Ubuntu等の git clone インストールに対応）
+[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+# pyenv が存在する場合のみ初期化（Homebrew 経由でも git clone 経由でも動作）
+if command -v pyenv 1>/dev/null 2>&1; then
+  eval "$(pyenv init --path)"
+  eval "$(pyenv init -)"
+fi
 export LDFLAGS="-L/opt/homebrew/opt/zlib/lib"
 export CPPFLAGS="-I/opt/homebrew/opt/zlib/include"
 export PKG_CONFIG_PATH="/opt/homebrew/opt/zlib/lib/pkgconfig"
