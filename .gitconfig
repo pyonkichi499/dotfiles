@@ -35,3 +35,7 @@
 	gpgSign = true
 [init]
 	defaultBranch = main
+
+# 個人用GitHub設定（特定ディレクトリ配下で有効）
+[includeIf "gitdir:~/work/practice/private_github/"]
+	path = ~/.gitconfig-personal
