@@ -158,3 +158,10 @@ eval "$(starship init zsh)"
 
 # fnm for node version management``
 eval "$(fnm env --use-on-cd)"
+
+# bun completions
+[ -s "/Users/terauchi.hiroshi/.bun/_bun" ] && source "/Users/terauchi.hiroshi/.bun/_bun"
+
+# bun
+export BUN_INSTALL="$HOME/.bun"
+export PATH="$BUN_INSTALL/bin:$PATH"
