@@ -1,0 +1,1 @@
+/Users/terauchi.hiroshi/dotfiles/.codex/AGENTS.md
