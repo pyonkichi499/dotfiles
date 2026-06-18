@@ -24,7 +24,7 @@ IFS='|' read -r session_name model_name cwd cost ctx_remaining <<< \
     (.context_window.remaining_percentage // 0 | tostring)
   ] | join("|")')"
 
-cwd_str="${cwd/#$HOME/~}"
+cwd_str="${PWD##*/}"
 
 # ─── OAuth Usage API ───
 
