@@ -1,0 +1,11 @@
+font-family = Hack Nerd Font Mono
+font-size = 22
+font-thicken = true        # 細いフォントを少し太く見せる(macOS のみ)
+adjust-cell-height = 2     # 行間を少し広げて読みやすく
+
+sidebar-font-size = 16
+surface-tab-bar-font-size = 30
+
+cursor-style = block
+cursor-style-blink = false
+shell-integration-features = no-cursor
