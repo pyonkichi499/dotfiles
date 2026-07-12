@@ -1,9 +1,13 @@
-[user]
-	email = terauchi.hiroshi@cloud-ace.jp
-	name = terauchi hiroshi
-	signingkey = 2F0D81F32A9C1678
-[credential]
-    helper = store --file ~/.git-credentials
+# 個人用GitHub設定（特定ディレクトリ配下で有効）
+[includeIf "gitdir:/home/hiroshi/work/private_github/"]
+	path = ~/.gitconfig-personal
+
+# [user]
+# 	email = terauchi.hiroshi@cloud-ace.jp
+# 	name = terauchi hiroshi
+# 	signingkey = hoge
+# [credential]
+#     helper = store --file ~/.git-credentials
 
 [color]
     diff = auto
@@ -35,7 +39,3 @@
 	gpgSign = true
 [init]
 	defaultBranch = main
-
-# 個人用GitHub設定（特定ディレクトリ配下で有効）
-[includeIf "gitdir:~/work/practice/private_github/"]
-	path = ~/.gitconfig-personal

@@ -23,6 +23,7 @@ alias zcat='gzcat'
 alias docker-compose="docker compose"
 alias history='history -t "%F %T"'
 
+export HISTFILE=~/.zsh_history
 export HISTSIZE=10000
 export SAVEHIST=1000000
 setopt hist_ignore_dups
@@ -52,7 +53,7 @@ autoload -U +X bashcompinit && bashcompinit
 complete -o nospace -C /usr/local/bin/terraform terraform
 export PATH=$HOME/.nodebrew/current/bin:$PATH
 
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+source <(fzf --zsh)
 export FZF_COMPLETION_TRIGGER="," # default: '**'
 source ~/.github/kwhrtsk/docker-fzf-completion/docker-fzf.zsh
 
@@ -124,12 +125,6 @@ if [[ -n $(echo ${^fpath}/chpwd_recent_dirs(N)) && -n $(echo ${^fpath}/cdr(N)) ]
     zstyle ':chpwd:*' recent-dirs-file "$HOME/.cache/chpwd-recent-dirs"
 fi
 
-# The next line updates PATH for the Google Cloud SDK.
-if [ -f '$HOME/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/path.zsh.inc'; fi
-
-# The next line enables shell command completion for gcloud.
-if [ -f '$HOME/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/terauchi.hiroshi/Downloads/google-cloud-sdk/completion.zsh.inc'; fi
-
 
 # switch between m2 to rosetta
 alias x86='arch -x86_64 zsh'
@@ -165,3 +160,34 @@ eval "$(fnm env --use-on-cd)"
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
+
+# Cursor (WSL): Windows 側の cursor CLI があれば PATH に追加
+cursor_win_bin="/mnt/c/Users/$USER/AppData/Local/Programs/cursor/resources/app/bin"
+[[ -d "$cursor_win_bin" ]] && export PATH="$PATH:$cursor_win_bin"
+alias cursor="/mnt/c/Users/$USER/scoop/apps/cursor/current/resources/app/bin/cursor"
+
+export GPG_TTY=$(tty)
+
+# 単語の移動
+bindkey "^[[1;5C" forward-word
+bindkey "^[[1;5D" backward-word
+# ^H（Backspace）でカーソル前の単語を削除
+bindkey "^H" backward-kill-word
+bindkey "^AK" kill-whole-line
+
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
+# fnm
+FNM_PATH="/home/hiroshi/.local/share/fnm"
+if [ -d "$FNM_PATH" ]; then
+  export PATH="$FNM_PATH:$PATH"
+  eval "$(fnm env --shell zsh)"
+fi
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/home/hiroshi/google-cloud-sdk/path.zsh.inc' ]; then . '/home/hiroshi/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/home/hiroshi/google-cloud-sdk/completion.zsh.inc' ]; then . '/home/hiroshi/google-cloud-sdk/completion.zsh.inc'; fi
