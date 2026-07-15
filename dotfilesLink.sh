@@ -3,6 +3,7 @@
 ln -sf ~/dotfiles/.bashrc ~/.bashrc
 ln -sf ~/dotfiles/.zshenv ~/.zshenv
 ln -sf ~/dotfiles/.zshrc ~/.zshrc
+ln -sf ~/dotfiles/.zsh ~/.zsh   # zsh モジュール群（00-env.zsh 等）
 
 # git
 ln -sf ~/dotfiles/.gitconfig ~/.gitconfig
@@ -12,7 +13,7 @@ ln -sf ~/dotfiles/.gitignore ~/.gitignore
 # LLM
 ln -sf ~/dotfiles/.claude/settings.json ~/.claude/settings.json
 ln -sf ~/dotfiles/.claude/statusline.sh ~/.claude/statusline.sh
-ln -sf ~/dotfiles/.codex/AGENTS.md
+ln -sf ~/dotfiles/.codex/AGENTS.md ~/dotfiles/AGENTS.md
 
 # etc
 ln -sf ~/dotfiles/.config/starship.toml ~/.config/starship.toml
