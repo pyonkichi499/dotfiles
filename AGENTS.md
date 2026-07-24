@@ -1,1 +1,1 @@
-/Users/terauchi.hiroshi/dotfiles/.codex/AGENTS.md
+/home/hiroshi/dotfiles/.codex/AGENTS.md
