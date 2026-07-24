@@ -2,6 +2,10 @@
 [includeIf "gitdir:/home/hiroshi/work/private_github/"]
 	path = ~/.gitconfig-personal
 
+# dotfiles ディレクトリ配下でも個人用設定を読み込む
+[includeIf "gitdir:/home/hiroshi/dotfiles/"]
+    path = ~/.gitconfig-personal
+
 # [user]
 # 	email = terauchi.hiroshi@cloud-ace.jp
 # 	name = terauchi hiroshi
