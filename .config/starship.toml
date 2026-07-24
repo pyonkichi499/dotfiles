@@ -7,6 +7,12 @@ truncation_length = 5
 [hostname]
 disabled = true
 
+[shell]
+format = "[$indicator]($style)"
+style = "bold cyan"
+disabled = false
+
+
 [time]
 format = "[$time ]($style)"
 style = "bold yellow"
