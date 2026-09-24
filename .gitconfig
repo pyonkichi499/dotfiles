@@ -25,7 +25,7 @@
     st = status -sb
 
 [core]
-	excludesfile = /Users/terauchi.hiroshi/.gitignore
+	excludesfile = ~/.gitignore
 	quotepath = false
 	editor = cursor --wait
 [filter "lfs"]
