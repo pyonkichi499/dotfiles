@@ -1,2 +1,4 @@
 # zmodload zsh/zprof && zprof
-. "$HOME/.cargo/env"
+if [[ -f "$HOME/.cargo/env" ]]; then
+  . "$HOME/.cargo/env"
+fi
