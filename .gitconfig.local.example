@@ -1,0 +1,10 @@
+# マシン固有の git 設定。~/.gitconfig.local にコピーして使う（git 管理外）
+# ~/.gitconfig の最後で読み込まれるので、共通設定を上書きできる
+
+# 例: macOS
+# [core]
+# 	editor = cursor --wait
+# [http]
+# 	cookiefile = ~/.gitcookies
+
+# 例: WSL2（editor 未設定なら $EDITOR=vim が使われる）

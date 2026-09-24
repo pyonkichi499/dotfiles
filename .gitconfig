@@ -1,9 +1,9 @@
 # 個人用GitHub設定（特定ディレクトリ配下で有効）
-[includeIf "gitdir:/home/hiroshi/work/private_github/"]
+[includeIf "gitdir:~/work/private_github/"]
 	path = ~/.gitconfig-personal
 
 # dotfiles ディレクトリ配下でも個人用設定を読み込む
-[includeIf "gitdir:/home/hiroshi/dotfiles/"]
+[includeIf "gitdir:~/dotfiles/"]
     path = ~/.gitconfig-personal
 
 # [user]
@@ -27,7 +27,6 @@
 [core]
 	excludesfile = ~/.gitignore
 	quotepath = false
-	editor = cursor --wait
 [filter "lfs"]
     process = git-lfs filter-process
     required = true
@@ -35,11 +34,13 @@
     smudge = git-lfs smudge -- %f
 [credential "https://source.developers.google.com"]
 	helper = gcloud.sh
-[http]
-	cookiefile = /Users/terauchi.hiroshi/.gitcookies
 [commit]
 	gpgsign = true
 [tag]
 	gpgSign = true
 [init]
 	defaultBranch = main
+
+# マシン固有の設定（editor, http.cookiefile など）。例は .gitconfig.local.example
+[include]
+	path = ~/.gitconfig.local
