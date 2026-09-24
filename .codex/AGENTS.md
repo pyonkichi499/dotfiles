@@ -5,7 +5,7 @@
 ## 基本設定
 
 - **言語**: 日本語で返信する
-- **OS**: macOS (Darwin)
+- **OS**: macOS (Darwin) / WSL2 (Ubuntu)
 - **シェル**: zsh
 
 ## コーディング規約

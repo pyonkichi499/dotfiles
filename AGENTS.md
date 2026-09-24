@@ -1,1 +1,1 @@
-/home/hiroshi/dotfiles/.codex/AGENTS.md
+.codex/AGENTS.md
