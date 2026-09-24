@@ -113,12 +113,11 @@ if ! shopt -oq posix; then
     . /etc/bash_completion
   fi
 fi
-source /google/devshell/bashrc.google
-
-export PATH="$PATH:$HOME/.cargo/bin"
+# Cloud Shell only
+[ -f /google/devshell/bashrc.google ] && . /google/devshell/bashrc.google
 
 export PATH="$PATH:$HOME/.local/bin"
-. "$HOME/.cargo/env"
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
