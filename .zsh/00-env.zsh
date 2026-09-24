@@ -15,10 +15,10 @@ setopt share_history
 setopt extended_history
 
 export HISTFILE=~/.zsh_history
-export HISTSIZE=10000
-export SAVEHIST=1000000
+export HISTSIZE=100000
+export SAVEHIST=100000
 
 export EDITOR=vim
-export LC_ALL=en_US.UTF-8
-export LANG=ja_JP.UTF-8
+# Set LANG only; LC_ALL would force-override every LC_* category
+export LANG=en_US.UTF-8
 export GPG_TTY=$(tty)
