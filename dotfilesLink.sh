@@ -1,24 +1,40 @@
 #!/bin/bash
+# ~/dotfiles の設定ファイルをホームディレクトリにシンボリックリンクする
+# 何度実行しても同じ結果になる。既存の実ファイルは *.bak に退避する
+set -euo pipefail
+
+DOTFILES="$HOME/dotfiles"
+
+link() {
+  local src="$DOTFILES/$1" dest="$HOME/$2"
+  mkdir -p "$(dirname "$dest")"
+  if [[ -e "$dest" && ! -L "$dest" ]]; then
+    mv "$dest" "$dest.bak"
+    echo "backup: $dest -> $dest.bak"
+  fi
+  # -n: dest がディレクトリへのリンクでも、その中にリンクを作らず置き換える
+  ln -sfn "$src" "$dest"
+}
+
 # shell
-ln -sf ~/dotfiles/.bashrc ~/.bashrc
-ln -sf ~/dotfiles/.zshenv ~/.zshenv
-ln -sf ~/dotfiles/.zshrc ~/.zshrc
-ln -sf ~/dotfiles/.zsh ~/.zsh   # zsh モジュール群（00-env.zsh 等）
+link .bashrc .bashrc
+link .zshenv .zshenv
+link .zshrc .zshrc
+link .zsh .zsh   # zsh モジュール群（00-env.zsh 等）
 
 # git
-ln -sf ~/dotfiles/.gitconfig ~/.gitconfig
-ln -sf ~/dotfiles/.gitconfig-personal ~/.gitconfig-personal
-ln -sf ~/dotfiles/.gitignore ~/.gitignore
+link .gitconfig .gitconfig
+link .gitconfig-personal .gitconfig-personal
+link .gitignore .gitignore
 
 # LLM
-ln -sf ~/dotfiles/.claude/settings.json ~/.claude/settings.json
-ln -sf ~/dotfiles/.claude/statusline.sh ~/.claude/statusline.sh
-ln -sf ~/dotfiles/.codex/AGENTS.md ~/dotfiles/AGENTS.md
+link .claude/settings.json .claude/settings.json
+link .claude/statusline.sh .claude/statusline.sh
 
 # etc
-ln -sf ~/dotfiles/.config/starship.toml ~/.config/starship.toml
-ln -sf ~/dotfiles/.config/ghostty/config ~/.config/ghostty/config
-ln -sf ~/dotfiles/.customize_environment ~/.customize_environment
-ln -sf ~/dotfiles/.tmux.conf ~/.tmux.conf
-ln -sf ~/dotfiles/.ssh/config ~/.ssh/config
-ln -sf ~/dotfiles/.vimrc ~/.vimrc
+link .config/starship.toml .config/starship.toml
+link .config/ghostty/config .config/ghostty/config
+link .customize_environment .customize_environment
+link .tmux.conf .tmux.conf
+link .ssh/config .ssh/config
+link .vimrc .vimrc
