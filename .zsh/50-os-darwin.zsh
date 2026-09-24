@@ -40,6 +40,10 @@ export CPPFLAGS="-I/usr/local/opt/openjdk/include"
 # iTerm2 shell integration
 [[ -f "$HOME/.iterm2_shell_integration.zsh" ]] && source "$HOME/.iterm2_shell_integration.zsh"
 
+# BSD ls colors / gzcat (GNU zcat equivalent)
+export LSCOLORS=gxfxcxdxbxegedabagacad
+alias zcat='gzcat'
+
 # Rosetta / Apple Silicon
 alias x86='arch -x86_64 zsh'
 alias arm='arch -arm64e zsh'

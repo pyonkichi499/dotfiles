@@ -1,11 +1,8 @@
 # Aliases
 
-export LSCOLORS=gxfxcxdxbxegedabagacad
-
 alias ls="ls --color=auto"
-alias ll="ls -GalFh"
+alias ll="ls -alFh"
 alias grep="grep --color"
-alias zcat='gzcat'
 alias docker-compose="docker compose"
 alias history='history -t "%F %T"'
 
