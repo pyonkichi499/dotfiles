@@ -3,11 +3,21 @@
 fpath=(~/.zsh/completion $fpath)
 
 autoload -Uz compinit
-if [[ -n ${ZDOTDIR:-$HOME}/.zcompdump(#qN.mh+24) ]]; then
-  compinit -C
-else
-  compinit
-fi
+# Regenerate the dump only when it is missing or older than 24h.
+# Glob qualifiers are not expanded inside [[ ]], so expand into an array first.
+# compinit reuses an existing dump unless the number of completion files changed,
+# so remove a stale dump to force regeneration.
+() {
+  setopt local_options extended_glob
+  local dump=${ZDOTDIR:-$HOME}/.zcompdump
+  local -a stale=($dump(#qN.mh+24))
+  if (( $#stale )) || [[ ! -e $dump ]]; then
+    rm -f $dump
+    compinit
+  else
+    compinit -C
+  fi
+}
 
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 
