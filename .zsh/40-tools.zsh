@@ -58,3 +58,29 @@ if command -v fnm >/dev/null 2>&1; then
   fi
   unset __fnm_env
 fi
+
+# claude: Claude Code のトレースを Langfuse (OTLP) に常時送信する
+# 認証情報は git 管理外の ~/.langfuse.env (LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY) に置く
+# ファイルが無い、または項目が足りないときは、送信せずにそのまま起動する
+claude() {
+  local env_file="$HOME/.langfuse.env"
+  [[ -f "$env_file" ]] || { command claude "$@"; return; }
+  (
+    set -a; source "$env_file"; set +a
+    if [[ -z "${LANGFUSE_HOST:-}" || -z "${LANGFUSE_PUBLIC_KEY:-}" || -z "${LANGFUSE_SECRET_KEY:-}" ]]; then
+      echo "claude: $env_file に LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY が揃っていないため、Langfuse へ送信せずに起動します" >&2
+    else
+      local auth
+      auth=$(printf '%s:%s' "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n')
+      export CLAUDE_CODE_ENABLE_TELEMETRY=1
+      export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
+      export OTEL_TRACES_EXPORTER="otlp"
+      export OTEL_LOG_USER_PROMPTS=1
+      export OTEL_LOG_ASSISTANT_RESPONSES=1
+      export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+      export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${LANGFUSE_HOST%/}/api/public/otel/v1/traces"
+      export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic ${auth}"
+    fi
+    command claude "$@"
+  )
+}
