@@ -28,7 +28,7 @@ macOS では `.gitconfig.local.example` を参考に `~/.gitconfig.local` を作
 - `.zshrc` から `.zsh/NN-*.zsh` を番号順に読み込む
   - `50-os-darwin.zsh` / `51-os-linux.zsh` に OS 固有の設定を置く
 - `.gitconfig` は `~/work/private_github/` と `~/dotfiles/` の配下でだけ `.gitconfig-personal`（個人用の user と署名鍵）を読み込む
-- `.codex/AGENTS.md` は AI エージェント向けの指示（リポジトリ直下の `AGENTS.md` はそこへのリンク）
+- `ai/AGENTS.md` は AI コーディングツール共通の指示。`~/.claude/CLAUDE.md`・`~/.codex/AGENTS.md`・リポジトリ直下の `AGENTS.md` はここへのリンク（詳細は `docs/ai-commit-rules.md`）
 
 ## 使っているツール
 

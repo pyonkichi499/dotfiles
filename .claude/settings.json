@@ -1,7 +1,8 @@
 {
   "attribution": {
     "commit": "",
-    "pr": ""
+    "pr": "",
+    "sessionUrl": false
   },
   "model": "sonnet",
   "statusLine": {
@@ -9,5 +10,8 @@
     "command": "bash ~/.claude/statusline.sh"
   },
   "skipWorkflowUsageWarning": true,
-  "theme": "auto"
+  "theme": "auto",
+  "permissions": {
+    "blockReadsOutsideWorkingDirectories": true
+  }
 }

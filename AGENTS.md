@@ -1,1 +1,1 @@
-.codex/AGENTS.md
+ai/AGENTS.md

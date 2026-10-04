@@ -30,6 +30,8 @@ link .gitignore .gitignore
 # LLM
 link .claude/settings.json .claude/settings.json
 link .claude/statusline.sh .claude/statusline.sh
+link ai/AGENTS.md .claude/CLAUDE.md   # AI ツール共通の指示
+link ai/AGENTS.md .codex/AGENTS.md
 
 # etc
 link .config/starship.toml .config/starship.toml
