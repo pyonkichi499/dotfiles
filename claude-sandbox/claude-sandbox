@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shlex
@@ -535,6 +536,31 @@ def host_mountpoints(plan: Plan) -> list[tuple[Path, bool]]:
     return points
 
 
+def mark_onboarded(state_dir: Path) -> None:
+    """コンテナの HOME の .claude.json に hasCompletedOnboarding を書き込む
+
+    無いと、トークンで認証できていても初回起動の画面になり、ログインを求められる。
+    既存の値（会話の履歴など）は残し、読めない .claude.json は書き換えない
+    """
+    path = state_dir / ".claude.json"
+    try:
+        data = json.loads(path.read_text()) if path.exists() else {}
+    except (OSError, json.JSONDecodeError) as e:
+        warn(f"{path} を読めないため、初回起動の画面が出るかもしれません（{e}）")
+        return
+    if not isinstance(data, dict):
+        warn(f"{path} の中身がオブジェクトではないため、初回起動の画面が出るかもしれません")
+        return
+    if data.get("hasCompletedOnboarding") is True:
+        return
+    data["hasCompletedOnboarding"] = True
+    tmp = path.with_name(f"{path.name}.claude-sandbox.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    tmp.replace(path)
+
+
 # ---------- 事前チェック ----------
 
 def token_problem() -> str | None:
@@ -594,6 +620,7 @@ def cmd_run(cli: Cli, command: list[str]) -> int:
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.touch(exist_ok=True)
+    mark_onboarded(state_dir)
     # ネットワークは compose の外で作る（compose の down で消えないように）
     if not docker_ok("network", "inspect", NETWORK):
         subprocess.run(["docker", "network", "create", NETWORK], check=True, stdout=subprocess.DEVNULL)

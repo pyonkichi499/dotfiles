@@ -348,3 +348,24 @@ class TestHostMountpoints:
             (repo.state_dir / "cache", True),
             (repo_dir / "data.txt", False),
         ]
+
+
+class TestMarkOnboarded:
+    def test_creates_file(self, tmp_path):
+        cs.mark_onboarded(tmp_path)
+        path = tmp_path / ".claude.json"
+        assert cs.json.loads(path.read_text()) == {"hasCompletedOnboarding": True}
+        assert path.stat().st_mode & 0o777 == 0o600
+
+    def test_keeps_existing_values(self, tmp_path):
+        path = tmp_path / ".claude.json"
+        path.write_text('{"userID": "abc", "hasCompletedOnboarding": false}')
+        cs.mark_onboarded(tmp_path)
+        assert cs.json.loads(path.read_text()) == {"userID": "abc", "hasCompletedOnboarding": True}
+
+    def test_leaves_broken_file(self, tmp_path, capsys):
+        path = tmp_path / ".claude.json"
+        path.write_text("{broken")
+        cs.mark_onboarded(tmp_path)
+        assert path.read_text() == "{broken"
+        assert "読めない" in capsys.readouterr().err
