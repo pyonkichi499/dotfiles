@@ -1,6 +1,13 @@
 # Claude Code の OTel トレースを受けて Langfuse の形式に変換し、ローカルの Langfuse に送る Collector
-# 前提: Langfuse を docker compose で起動済み（ネットワーク langfuse_default）
+# 前提:
+#   - Langfuse を docker compose で起動済み（ネットワーク langfuse_default）
+#   - ネットワーク claude_sandbox を作成済み（docker network create claude_sandbox。claude-sandbox も無ければ作る）
 # 起動: docker compose -f ~/dotfiles/langfuse/compose.yml up -d
+
+# 既定のプロジェクト名はディレクトリ名（langfuse）で、Langfuse 本体と同じになる。
+# 同じだと本体が orphan 扱いになり、--remove-orphans で消えてしまうので分ける
+name: langfuse-otel
+
 services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.161.0
@@ -12,9 +19,14 @@ services:
     ports:
       - 127.0.0.1:4318:4318
     networks:
-      - langfuse
+      - langfuse        # Langfuse に送る
+      - claude_sandbox  # claude-sandbox のコンテナから受ける。Langfuse 本体はこのネットワークにいない
 
 networks:
   langfuse:
     name: langfuse_default
+    external: true
+  # claude-sandbox と共有する。compose の down で消えないよう、compose の外で作る
+  claude_sandbox:
+    name: claude_sandbox
     external: true

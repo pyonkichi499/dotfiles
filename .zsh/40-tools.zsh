@@ -75,12 +75,10 @@ claude() {
     if git_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
       [[ $git_dir == */.git ]] && repo=${git_dir:h:t} || repo=${${git_dir:t}%.git}
     fi
-    export CLAUDE_CODE_ENABLE_TELEMETRY=1
-    export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
-    export OTEL_TRACES_EXPORTER="otlp"
-    export OTEL_LOG_USER_PROMPTS=1
-    export OTEL_LOG_ASSISTANT_RESPONSES=1
-    export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+    # claude-sandbox と共通の設定
+    set -a
+    source "$HOME/dotfiles/langfuse/claude-otel.env"
+    set +a
     export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="$endpoint/v1/traces"
     export OTEL_RESOURCE_ATTRIBUTES="git.repo=${repo//[^A-Za-z0-9._-]/_}"
     command claude "$@"

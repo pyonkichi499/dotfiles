@@ -17,6 +17,8 @@
 - 送信するもの: トレース（OTLP / `http/protobuf`）、ユーザーのプロンプト (`OTEL_LOG_USER_PROMPTS`)、アシスタントの応答 (`OTEL_LOG_ASSISTANT_RESPONSES`)
 - 送らないもの: ツールの入出力 (`OTEL_LOG_TOOL_CONTENT`)、API の生データ (`OTEL_LOG_RAW_API_BODIES`)。秘密情報が入りうるため
 - `langfuse-observability` プラグインは `settings.json` から外した（無効化）。ただし本体は `~/.claude/plugins/` に残っている
+- Docker 内の Claude Code（`claude-sandbox`、2026-10-04 追加）も、専用ネットワーク `claude_sandbox` 経由で同じ Collector に送る。詳細は `claude-sandbox/README.md`
+  - 送信の設定は `langfuse/claude-otel.env` に共通化し、`claude` 関数と `claude-sandbox` の両方が読む
 
 ### `~/.langfuse.env`（git 管理外。`.gitignore` 済み）
 
@@ -167,6 +169,15 @@ OTel 方式は計測（時間・トークン・権限待ち）が細かく、プ
   - Langfuse の clone に直接置く: 一緒に起動・停止できる。ただし upstream の clone なので git で管理できず、Mac とも共有できない。`claude` 関数（dotfiles）と変換ルールが別の場所に分かれる
   - ファイルは dotfiles に置き、`~/work/private_github/langfuse/docker-compose.override.yml` をシンボリックリンクにする（有力な案）: Langfuse の `docker compose up` で Collector も起動する。リンクは `dotfilesLink.sh` で張る
 - 判断（2026-10-04）: 今のままにする。必要になったらシンボリックリンクの案を検討する
+
+### 9. Langfuse の一部のポートが 0.0.0.0 に公開されている（未対応。判断待ち）
+
+- 状況（2026-10-04 に実測）: Langfuse 本体の compose で、`langfuse-web`（3000）と minio（9090）が `0.0.0.0` に公開されている。WSL2 は mirrored モードなので、LAN の IP（`192.168.0.7`）でも届く
+- 影響:
+  - `claude-sandbox` のコンテナから、ゲートウェイ（`172.20.0.1`）や LAN の IP 経由で `langfuse-web` と minio に届く。専用ネットワークで Collector にしか届かないようにした意図が、ホスト経由で崩れる
+  - minio にはトレースのデータ（プロンプトを含む）が入る。既定の認証情報のままなら読める可能性がある（未確認）
+  - LAN の他の機器からも届く可能性がある（Windows のファイアウォールの設定次第。未確認）
+- 候補: Langfuse の clone に `docker-compose.override.yml`（upstream のファイルは変えない）を置き、3000 と 9090 を `127.0.0.1` に限定する。`127.0.0.1` に限定したポートには、コンテナから届かないことを確認済み
 
 ## 参考
 
