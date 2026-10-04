@@ -1,0 +1,41 @@
+extensions:
+  basicauth/langfuse:
+    client_auth:
+      username: ${env:LANGFUSE_PUBLIC_KEY}
+      password: ${env:LANGFUSE_SECRET_KEY}
+
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  transform/langfuse:
+    error_mode: ignore
+    trace_statements:
+      # Claude Code はトークン数を独自の属性名で送るので、Langfuse が読む usage_details に変換する（コストの計算に使われる）
+      - conditions:
+          - span.attributes["span.type"] == "llm_request" and span.attributes["input_tokens"] != nil
+        statements:
+          - set(span.attributes["langfuse.observation.usage_details"], Format("{\"input\":%d,\"output\":%d,\"cache_read_input_tokens\":%d,\"cache_creation_input_tokens\":%d}", [span.attributes["input_tokens"], span.attributes["output_tokens"], span.attributes["cache_read_tokens"], span.attributes["cache_creation_tokens"]]))
+      # claude 関数が付けたリポジトリ名を、絞り込みと集計に使えるタグにする
+      - conditions:
+          - resource.attributes["git.repo"] != nil
+        statements:
+          - set(span.attributes["langfuse.trace.tags"], [Concat(["repo:", resource.attributes["git.repo"]], "")])
+  batch: {}
+
+exporters:
+  otlp_http/langfuse:
+    traces_endpoint: http://langfuse-web:3000/api/public/otel/v1/traces
+    auth:
+      authenticator: basicauth/langfuse
+
+service:
+  extensions: [basicauth/langfuse]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [transform/langfuse, batch]
+      exporters: [otlp_http/langfuse]

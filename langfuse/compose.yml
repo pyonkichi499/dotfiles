@@ -1,0 +1,20 @@
+# Claude Code の OTel トレースを受けて Langfuse の形式に変換し、ローカルの Langfuse に送る Collector
+# 前提: Langfuse を docker compose で起動済み（ネットワーク langfuse_default）
+# 起動: docker compose -f ~/dotfiles/langfuse/compose.yml up -d
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.161.0
+    container_name: langfuse-otel-collector
+    restart: unless-stopped
+    env_file: ${HOME}/.langfuse.env
+    volumes:
+      - ./otelcol.yaml:/etc/otelcol-contrib/config.yaml:ro
+    ports:
+      - 127.0.0.1:4318:4318
+    networks:
+      - langfuse
+
+networks:
+  langfuse:
+    name: langfuse_default
+    external: true

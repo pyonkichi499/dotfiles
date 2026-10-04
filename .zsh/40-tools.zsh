@@ -59,28 +59,30 @@ if command -v fnm >/dev/null 2>&1; then
   unset __fnm_env
 fi
 
-# claude: Claude Code のトレースを Langfuse (OTLP) に常時送信する
-# 認証情報は git 管理外の ~/.langfuse.env (LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY) に置く
-# ファイルが無い、または項目が足りないときは、送信せずにそのまま起動する
+# claude: Claude Code のトレースを OTel Collector (langfuse/compose.yml) 経由で Langfuse に常時送信する
+# 認証情報は Collector だけが持つので、claude の環境には鍵を渡さない
+# Collector が起動していないときは、送信せずにそのまま起動する
 claude() {
-  local env_file="$HOME/.langfuse.env"
-  [[ -f "$env_file" ]] || { command claude "$@"; return; }
+  local endpoint="http://localhost:4318"
+  if ! curl -s -o /dev/null -m 1 "$endpoint"; then
+    echo "claude: OTel Collector ($endpoint) に接続できないため、Langfuse へ送信せずに起動します" >&2
+    command claude "$@"
+    return
+  fi
   (
-    set -a; source "$env_file"; set +a
-    if [[ -z "${LANGFUSE_HOST:-}" || -z "${LANGFUSE_PUBLIC_KEY:-}" || -z "${LANGFUSE_SECRET_KEY:-}" ]]; then
-      echo "claude: $env_file に LANGFUSE_HOST / LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY が揃っていないため、Langfuse へ送信せずに起動します" >&2
-    else
-      local auth
-      auth=$(printf '%s:%s' "$LANGFUSE_PUBLIC_KEY" "$LANGFUSE_SECRET_KEY" | base64 | tr -d '\n')
-      export CLAUDE_CODE_ENABLE_TELEMETRY=1
-      export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
-      export OTEL_TRACES_EXPORTER="otlp"
-      export OTEL_LOG_USER_PROMPTS=1
-      export OTEL_LOG_ASSISTANT_RESPONSES=1
-      export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
-      export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${LANGFUSE_HOST%/}/api/public/otel/v1/traces"
-      export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Basic ${auth}"
+    # リポジトリごとに集計できるよう、起動したリポジトリ名を付ける（worktree からでも元のリポジトリ名になる）
+    local git_dir repo=none
+    if git_dir=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); then
+      [[ $git_dir == */.git ]] && repo=${git_dir:h:t} || repo=${${git_dir:t}%.git}
     fi
+    export CLAUDE_CODE_ENABLE_TELEMETRY=1
+    export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1
+    export OTEL_TRACES_EXPORTER="otlp"
+    export OTEL_LOG_USER_PROMPTS=1
+    export OTEL_LOG_ASSISTANT_RESPONSES=1
+    export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+    export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="$endpoint/v1/traces"
+    export OTEL_RESOURCE_ATTRIBUTES="git.repo=${repo//[^A-Za-z0-9._-]/_}"
     command claude "$@"
   )
 }
