@@ -306,3 +306,45 @@ class TestDockerRunArgs:
         d.mkdir()
         mounts = mounts_of(cs.docker_run_args(make_plan(cs.detect_repo(d)), ["claude"]))
         assert not any(".git" in m for m in mounts)
+
+
+class TestSkills:
+    def test_mounts_linked_skills(self, isolated_home, repo_dir):
+        agents = isolated_home / ".agents" / "skills"
+        for name in ("alpha", "no-skill-md"):
+            (agents / name).mkdir(parents=True)
+        (agents / "alpha" / "SKILL.md").write_text("---\nname: alpha\n---\n")
+        skills = isolated_home / ".claude" / "skills"
+        (skills / "synced" / "x").mkdir(parents=True)
+        (skills / "synced" / "x" / "SKILL.md").write_text("")
+        (skills / "alpha").symlink_to("../../.agents/skills/alpha")
+        (skills / "no-skill-md").symlink_to("../../.agents/skills/no-skill-md")
+
+        assert cs.skill_mounts() == [cs.Mount(agents / "alpha", "/home/sandbox/.claude/skills/alpha")]
+        mounts = mounts_of(cs.docker_run_args(make_plan(cs.detect_repo(repo_dir)), ["claude"]))
+        assert f"type=bind,source={agents}/alpha,target=/home/sandbox/.claude/skills/alpha,readonly" in mounts
+
+    def test_no_skills_dir(self):
+        assert cs.skill_mounts() == []
+
+
+class TestHostMountpoints:
+    def test_home_and_repo_targets(self, isolated_home, repo_dir, tmp_path):
+        agents = isolated_home / ".agents" / "skills" / "alpha"
+        agents.mkdir(parents=True)
+        (agents / "SKILL.md").write_text("")
+        (isolated_home / ".claude" / "skills").mkdir(parents=True)
+        (isolated_home / ".claude" / "skills" / "alpha").symlink_to(agents)
+        data_file = tmp_path / "data.txt"
+        data_file.write_text("")
+        repo = cs.detect_repo(repo_dir)
+        settings = cs.Settings(mounts=[
+            cs.Mount(tmp_path, "/home/sandbox/cache"),
+            cs.Mount(data_file, f"{repo_dir}/data.txt"),
+            cs.Mount(tmp_path, "/data"),  # コンテナ内だけのパスは作らない
+        ])
+        assert cs.host_mountpoints(make_plan(repo, settings=settings)) == [
+            (repo.state_dir / ".claude" / "skills" / "alpha", True),
+            (repo.state_dir / "cache", True),
+            (repo_dir / "data.txt", False),
+        ]

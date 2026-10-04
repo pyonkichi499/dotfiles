@@ -103,6 +103,7 @@ claude-sandbox: カレントのリポジトリを Docker コンテナにマウ�
   - {short(token_file())} のトークン（CLAUDE_CODE_OAUTH_TOKEN）
   - git の名前とメールアドレス（ホストの git config の値）。コンテナ内でもコミットできるが、署名はされない
   - 共通の指示（{short(GLOBAL_INSTRUCTIONS)}）と AI の署名を入れない設定を、Claude Code の managed 設定として（読み取り専用）
+  - ホストの ~/.claude/skills にある skills（読み取り専用。synced は除く）
   - OTel の設定（Collector に届くときだけ。Langfuse に送る）
 渡さないもの:
   ホストの ~/.claude、~/.ssh、~/.gitconfig、GPG 鍵、Langfuse の鍵（push と署名はホストで行う）
@@ -380,6 +381,25 @@ def writable_hooks_path(repo: Repo) -> Path | None:
     return None
 
 
+def skill_mounts() -> list[Mount]:
+    """ホストの ~/.claude/skills の skills を、コンテナの ~/.claude/skills に読み取り専用で渡す
+
+    ホストの skills は ~/.agents/skills への相対リンクなので、リンク先を 1 つずつマウントする。
+    synced は claude.ai から同期されたもので、アカウントごとに Claude Code が管理するので渡さない
+    """
+    base = Path.home() / ".claude" / "skills"
+    if not base.is_dir():
+        return []
+    mounts = []
+    for entry in sorted(base.iterdir()):
+        source = entry.resolve()
+        if entry.name == "synced" or entry.name.startswith(".") or "," in f"{source}{entry.name}":
+            continue
+        if (source / "SKILL.md").is_file():
+            mounts.append(Mount(source, f"{CONTAINER_HOME}/.claude/skills/{entry.name}"))
+    return mounts
+
+
 def git_protect_mounts(repo: Repo) -> list[Mount]:
     """ホストの git が読む .git/config と .git/hooks を読み取り専用で重ねる"""
     d = repo.git_common_dir
@@ -471,7 +491,7 @@ def docker_run_args(plan: Plan, command: list[str]) -> list[str]:
         args += ["--mount", Mount(GLOBAL_INSTRUCTIONS.resolve(), f"{MANAGED_DIR}/CLAUDE.md").arg()]
     if MANAGED_SETTINGS.is_file():
         args += ["--mount", Mount(MANAGED_SETTINGS, f"{MANAGED_DIR}/managed-settings.json").arg()]
-    for m in plan.settings.mounts:
+    for m in [*skill_mounts(), *plan.settings.mounts]:
         args += ["--mount", m.arg()]
 
     args += [
@@ -496,6 +516,23 @@ def docker_run_args(plan: Plan, command: list[str]) -> list[str]:
         ]
     args.append("-it" if plan.tty else "-i")
     return args + [plan.image, *command]
+
+
+def host_mountpoints(plan: Plan) -> list[tuple[Path, bool]]:
+    """コンテナの HOME とリポジトリの中にあるマウント先を、ホスト側のパスと「ディレクトリか」の組で返す
+
+    無いまま docker run すると、docker が root の所有で作ってしまい、コンテナ内の Claude が
+    ~/.claude に書き込めなくなる（clean でも消せなくなる）。先にホストの UID で作っておく
+    """
+    home, state_dir = Path(CONTAINER_HOME), plan.repo.state_dir
+    points = []
+    for m in [*skill_mounts(), *plan.settings.mounts]:
+        target = Path(m.target)
+        if is_within(target, home):
+            points.append((state_dir / target.relative_to(home), m.source.is_dir()))
+        elif is_within(target, plan.repo.mount_root):
+            points.append((target, m.source.is_dir()))
+    return points
 
 
 # ---------- 事前チェック ----------
@@ -551,6 +588,12 @@ def cmd_run(cli: Cli, command: list[str]) -> int:
     # hooks が無いとコンテナ内で作れてしまうので、先に作って読み取り専用で重ねる
     if plan.repo.git_common_dir is not None:
         (plan.repo.git_common_dir / "hooks").mkdir(exist_ok=True)
+    for path, is_dir in host_mountpoints(plan):
+        if is_dir:
+            path.mkdir(parents=True, exist_ok=True)
+        else:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.touch(exist_ok=True)
     # ネットワークは compose の外で作る（compose の down で消えないように）
     if not docker_ok("network", "inspect", NETWORK):
         subprocess.run(["docker", "network", "create", NETWORK], check=True, stdout=subprocess.DEVNULL)
@@ -607,6 +650,8 @@ def cmd_doctor(cli: Cli) -> int:
         check(has_network or None, f"ネットワーク: {NETWORK}" + ("" if has_network else "（無いので起動時に作ります）"))
     check(plan.otel or None, "Langfuse: Collector に届きます" if plan.otel
           else f"Langfuse: Collector に届かないため送信しません（docker compose -f {DOTFILES}/langfuse/compose.yml up -d）")
+    skills = [m.target.rsplit("/", 1)[1] for m in skill_mounts()]
+    check(True, f"skills: {', '.join(skills) if skills else 'なし'}")
     for path, label in ((GLOBAL_INSTRUCTIONS, "共通の指示"), (MANAGED_SETTINGS, "managed settings")):
         check(path.is_file() or None, f"{label}: {path}" + ("" if path.is_file() else " がありません"))
     if plan.settings.env:
@@ -667,7 +712,20 @@ def cmd_clean(cli: Cli) -> int:
             os.chmod(path, 0o700)
         func(path)
 
-    shutil.rmtree(state_dir, onexc=make_writable)
+    try:
+        shutil.rmtree(state_dir, onexc=make_writable)
+    except PermissionError:
+        # 以前の版で docker が root の所有で作ったマウント先が残っていると、ホストの UID では消せない
+        warn("root の所有のファイルがあるので、コンテナの root で削除します")
+        if image_problem(DEFAULT_IMAGE):
+            raise SandboxError(f"{state_dir} を削除できません。イメージ {DEFAULT_IMAGE} が無いので、"
+                               "'claude-sandbox build' の後でやり直してください") from None
+        subprocess.run(
+            ["docker", "run", "--rm", "--network", "none", "--user", "0:0",
+             "--mount", Mount(state_dir, "/x", readonly=False).arg(), DEFAULT_IMAGE, "find", "/x", "-mindepth", "1", "-delete"],
+            check=True,
+        )
+        state_dir.rmdir()
     print(f"{state_dir} を削除しました")
     return 0
 

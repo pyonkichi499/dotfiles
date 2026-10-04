@@ -34,11 +34,14 @@ claude-sandbox clean                  # このリポジトリ用のコンテナ�
 | 渡す | `~/.claude-sandbox.env` のトークン（`CLAUDE_CODE_OAUTH_TOKEN`） |
 | 渡す | git の名前とメールアドレス（ホストの `git config` の値を `GIT_AUTHOR_*` / `GIT_COMMITTER_*` で） |
 | 渡す（読み取り専用） | 共通の指示（`ai/AGENTS.md`）を `/etc/claude-code/CLAUDE.md` に、`managed-settings.json`（AI の署名を入れない設定）を `/etc/claude-code/managed-settings.json` に |
+| 渡す（読み取り専用） | ホストの `~/.claude/skills` の skills を、コンテナの `~/.claude/skills/<名前>` に（リンク先の `~/.agents/skills/<名前>` をマウントする。claude.ai から同期される `synced` は除く） |
 | 渡す | OTel の設定（`langfuse/claude-otel.env`、送信先、`git.repo`）。Collector に届くときだけ |
 | 渡す | 設定ファイルの `env` と、ホスト側の設定の `mounts` |
 | 渡さない | ホストの `~/.claude`（認証情報と、全リポジトリの会話ログ） |
 | 渡さない | `~/.ssh`、`~/.gitconfig`、GPG 鍵（コンテナからは push も署名もできない） |
 | 渡さない | Langfuse の鍵（Collector だけが持つ） |
+| 渡さない | gh とその認証（ホストのトークンはすべてのリポジトリへの書き込みと、SSH 鍵・GPG 鍵の追加ができる）。gh はホストで使う |
+| 渡さない | ホストの `settings.json`、メモリー、statusline、plugins |
 
 その他の制限:
 
