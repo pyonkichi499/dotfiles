@@ -14,6 +14,7 @@ import os
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tomllib
@@ -106,6 +107,8 @@ claude-sandbox: カレントのリポジトリを Docker コンテナにマウ�
   - 共通の指示（{short(GLOBAL_INSTRUCTIONS)}）と AI の署名を入れない設定を、Claude Code の managed 設定として（読み取り専用）
   - ホストの ~/.claude/skills にある skills（読み取り専用。synced は除く）
   - OTel の設定（Collector に届くときだけ。Langfuse に送る）
+  - ホスト側の設定の devices に書いたデバイス（/dev/kvm など）。デバイスの所有グループもコンテナのユーザーに足す
+    ホストに無いか、キャラクタデバイスでなければ、警告を出してそのデバイスは渡さずに起動する
 渡さないもの:
   ホストの ~/.claude、~/.ssh、~/.gitconfig、GPG 鍵、Langfuse の鍵（push と署名はホストで行う）
 
@@ -115,12 +118,13 @@ claude-sandbox: カレントのリポジトリを Docker コンテナにマウ�
       [env]
       UV_PROJECT_ENVIRONMENT = "{CONTAINER_HOME}/.venv"
 
-  ホスト側の設定 {short(host_config_path())}: リポジトリのパスごとに image、env、mounts を書ける。リポジトリの設定より優先する
+  ホスト側の設定 {short(host_config_path())}: リポジトリのパスごとに image、env、mounts、devices を書ける。リポジトリの設定より優先する
       ["~/work/some-repo"]
       image = "my-image"
       mounts = [{{ source = "~/datasets/foo", target = "/data", readonly = true }}]   # readonly の既定は true
+      devices = ["/dev/kvm"]   # docker run に --device と --group-add <デバイスの GID> を付ける
 
-  mounts をホスト側にしか書けないのは、リポジトリ内のファイルはコンテナ内の Claude が書き換えられるため
+  mounts と devices をホスト側にしか書けないのは、リポジトリ内のファイルはコンテナ内の Claude が書き換えられるため
   env には HOME、TERM、OTEL_*、GIT_AUTHOR_* など、claude-sandbox が設定する変数は書けない
 
 制限と既知の制約:
@@ -252,10 +256,21 @@ class Mount:
 
 
 @dataclass
+class Device:
+    path: str
+    gid: int
+
+
+@dataclass
 class Settings:
     image: str | None = None
     env: dict[str, str] = field(default_factory=dict)
     mounts: list[Mount] = field(default_factory=list)
+    devices: list[str] = field(default_factory=list)
+
+
+# コンテナの外に広がるのでホスト側の設定にだけ書けるキー
+HOST_ONLY_KEYS = {"mounts", "devices"}
 
 
 def read_toml(path: Path) -> dict:
@@ -266,11 +281,12 @@ def read_toml(path: Path) -> dict:
         raise SandboxError(f"{path}: TOML として読めません（{e}）") from e
 
 
-def parse_settings(data: dict, origin: str, *, allow_mounts: bool) -> Settings:
-    allowed = {"image", "env", "mounts"} if allow_mounts else {"image", "env"}
+def parse_settings(data: dict, origin: str, *, host: bool) -> Settings:
+    allowed = {"image", "env"} | (HOST_ONLY_KEYS if host else set())
     unknown = sorted(set(data) - allowed)
     if unknown:
-        hint = f"。mounts はホスト側の設定（{host_config_path()}）にだけ書けます" if "mounts" in unknown else ""
+        hint = f"。{', '.join(sorted(HOST_ONLY_KEYS))} はホスト側の設定（{host_config_path()}）にだけ書けます" \
+            if HOST_ONLY_KEYS & set(unknown) else ""
         raise SandboxError(f"{origin}: 使えないキーがあります: {', '.join(unknown)}{hint}")
 
     settings = Settings()
@@ -295,6 +311,16 @@ def parse_settings(data: dict, origin: str, *, allow_mounts: bool) -> Settings:
     if not isinstance(mounts, list):
         raise SandboxError(f"{origin}: mounts は配列で書いてください")
     settings.mounts = [parse_mount(m, origin) for m in mounts]
+
+    devices = data.get("devices", [])
+    if not isinstance(devices, list):
+        raise SandboxError(f"{origin}: devices は配列で書いてください")
+    for device in devices:
+        # --device は <ホスト>:<コンテナ>:<権限> の形なので、: を含むパスは渡せない
+        if not isinstance(device, str) or not device.startswith("/") or ":" in device:
+            raise SandboxError(f"{origin}: devices の要素は : を含まない絶対パスの文字列で書いてください: {device!r}")
+        if device not in settings.devices:
+            settings.devices.append(device)
     return settings
 
 
@@ -324,7 +350,7 @@ def load_repo_settings(repo: Repo) -> Settings:
     path = repo.mount_root / REPO_CONFIG_NAME
     if not path.is_file():
         return Settings()
-    return parse_settings(read_toml(path), str(path), allow_mounts=False)
+    return parse_settings(read_toml(path), str(path), host=False)
 
 
 def load_host_settings(repo: Repo) -> Settings:
@@ -338,7 +364,7 @@ def load_host_settings(repo: Repo) -> Settings:
         if not isinstance(section, dict):
             raise SandboxError(f'{path}: トップレベルには ["<リポジトリのパス>"] のテーブルだけ書けます: {key}')
         if Path(key).expanduser().resolve() == repo.mount_root:
-            return parse_settings(section, f"{path} [{key}]", allow_mounts=True)
+            return parse_settings(section, f"{path} [{key}]", host=True)
     return Settings()
 
 
@@ -353,6 +379,35 @@ def resolve_image(cli_image: str | None, environ: dict[str, str], host: Settings
         if image:
             return image, origin
     return DEFAULT_IMAGE, "既定"
+
+
+def resolve_devices(paths: list[str]) -> tuple[list[Device], list[str]]:
+    """渡せるデバイスと、渡せない理由の一覧を返す
+
+    KVM の無い環境でも TCG などで作業を続けられるよう、渡せないデバイスはエラーにしない
+    """
+    devices, problems = [], []
+    for path in paths:
+        try:
+            st = os.stat(path)
+        except OSError as e:
+            problems.append(f"デバイス {path} がありません（{e.strerror}）")
+            continue
+        if not stat.S_ISCHR(st.st_mode):
+            problems.append(f"{path} はキャラクタデバイスではありません")
+            continue
+        devices.append(Device(path, st.st_gid))
+    return devices, problems
+
+
+def device_args(devices: list[Device]) -> list[str]:
+    """コンテナのユーザーはデバイスの所有グループに入っていないので、そのグループを足す"""
+    args = []
+    for d in devices:
+        args += ["--device", d.path]
+    for gid in dict.fromkeys(d.gid for d in devices):
+        args += ["--group-add", str(gid)]
+    return args
 
 
 # ---------- git ----------
@@ -437,6 +492,8 @@ class Plan:
     repo: Repo
     image: str
     settings: Settings
+    devices: list[Device]
+    device_problems: list[str]
     otel: bool
     git_env: dict[str, str]
     tty: bool
@@ -454,11 +511,15 @@ def make_plan(cli: Cli, workdir: Path) -> tuple[Plan, str]:
         image=image,
         env={**repo_settings.env, **host_settings.env},
         mounts=host_settings.mounts,
+        devices=host_settings.devices,
     )
+    devices, device_problems = resolve_devices(settings.devices)
     plan = Plan(
         repo=repo,
         image=image,
         settings=settings,
+        devices=devices,
+        device_problems=device_problems,
         otel=collector_reachable(),
         git_env=git_identity(repo.workdir),
         tty=sys.stdin.isatty() and sys.stdout.isatty(),
@@ -478,6 +539,7 @@ def docker_run_args(plan: Plan, command: list[str]) -> list[str]:
         "--user", plan.user,
         "--cap-drop", "ALL",
         "--security-opt", "no-new-privileges",
+        *device_args(plan.devices),
         "--mount", Mount(repo.mount_root, root, readonly=False).arg(),
         "--mount", Mount(repo.state_dir, CONTAINER_HOME, readonly=False).arg(),
     ]
@@ -601,6 +663,8 @@ def cmd_run(cli: Cli, command: list[str]) -> int:
              f"（docker compose -f {DOTFILES}/langfuse/compose.yml up -d）")
     if not plan.git_env:
         warn("git の user.name / user.email が見つからないため、コンテナ内ではコミットできません")
+    for problem in plan.device_problems:
+        warn(f"{problem}。渡さずに起動します")
 
     args = docker_run_args(plan, command)
     if cli.dry_run:
@@ -685,6 +749,23 @@ def cmd_doctor(cli: Cli) -> int:
         check(True, f"追加の環境変数: {', '.join(plan.settings.env)}")
     for m in plan.settings.mounts:
         check(True, f"追加のマウント: {m.source} → {m.target}（{'読み取り専用' if m.readonly else '読み書き可'}）")
+    for d in plan.devices:
+        label = f"デバイス: {d.path}（GID {d.gid}）"
+        if not docker_ready or image_problem(plan.image):
+            check(None, f"{label}。イメージを使えないため、開けるかは確認していません")
+            continue
+        # 起動時と同じ制限（UID、capability なし）で、コンテナ内から読み書きできるかを確かめる。
+        # シェル組み込みの test を使う（Ubuntu 26.04 の /usr/bin/test は補助グループを見ずに偽を返す）
+        opened = subprocess.run(
+            ["docker", "run", "--rm", "--network", "none", "--user", plan.user, "--cap-drop", "ALL",
+             "--security-opt", "no-new-privileges", *device_args([d]),
+             plan.image, "sh", "-c", 'test -r "$1" -a -w "$1"', "sh", d.path],
+            capture_output=True, text=True,
+        )
+        check(opened.returncode == 0, f"{label}、コンテナ内で読み書きできます" if opened.returncode == 0
+              else f"{label}、コンテナ内で読み書きできません {opened.stderr.strip()}".rstrip())
+    for problem in plan.device_problems:
+        check(None, f"{problem}（渡さずに起動します）")
 
     if repo.git_common_dir is None:
         check(None, "git: リポジトリではありません")

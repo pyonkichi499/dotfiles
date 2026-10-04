@@ -138,15 +138,16 @@ class TestSettings:
         settings = cs.load_repo_settings(cs.detect_repo(repo_dir))
         assert (settings.image, settings.env, settings.mounts) == ("img", {"FOO": "bar"}, [])
 
-    def test_repo_settings_reject_mounts(self, repo_dir):
-        (repo_dir / ".claude-sandbox.toml").write_text('mounts = [{ source = "/tmp", target = "/x" }]\n')
+    @pytest.mark.parametrize("text", ['mounts = [{ source = "/tmp", target = "/x" }]\n', 'devices = ["/dev/kvm"]\n'])
+    def test_repo_settings_reject_host_only_keys(self, repo_dir, text):
+        (repo_dir / ".claude-sandbox.toml").write_text(text)
         with pytest.raises(cs.SandboxError, match="ホスト側の設定"):
             cs.load_repo_settings(cs.detect_repo(repo_dir))
 
     @pytest.mark.parametrize("env", ["OTEL_FOO", "HOME", "GIT_AUTHOR_NAME", "CLAUDE_CODE_OAUTH_TOKEN"])
     def test_reserved_env(self, env):
         with pytest.raises(cs.SandboxError, match="claude-sandbox が設定する"):
-            cs.parse_settings({"env": {env: "x"}}, "t", allow_mounts=False)
+            cs.parse_settings({"env": {env: "x"}}, "t", host=False)
 
     @pytest.mark.parametrize("data", [
         {"image": ""},
@@ -155,10 +156,18 @@ class TestSettings:
         {"env": {"FOO": 1}},
         {"env": "FOO=1"},
         {"unknown": 1},
+        {"devices": "/dev/kvm"},
+        {"devices": ["dev/kvm"]},
+        {"devices": ["/dev/kvm:/dev/kvm"]},
+        {"devices": [1]},
     ])
     def test_invalid(self, data):
         with pytest.raises(cs.SandboxError):
-            cs.parse_settings(data, "t", allow_mounts=False)
+            cs.parse_settings(data, "t", host=True)
+
+    def test_devices_deduplicated(self):
+        settings = cs.parse_settings({"devices": ["/dev/kvm", "/dev/null", "/dev/kvm"]}, "t", host=True)
+        assert settings.devices == ["/dev/kvm", "/dev/null"]
 
     def test_broken_toml(self, repo_dir):
         (repo_dir / ".claude-sandbox.toml").write_text("image = \n")
@@ -174,6 +183,7 @@ image = "other"
 
 ["{repo_dir}"]
 image = "mine"
+devices = ["/dev/kvm"]
 mounts = [
   {{ source = "~/data", target = "/data" }},
   {{ source = "~/data", target = "/data-rw", readonly = false }},
@@ -181,6 +191,7 @@ mounts = [
 """)
         settings = cs.load_host_settings(cs.detect_repo(repo_dir))
         assert settings.image == "mine"
+        assert settings.devices == ["/dev/kvm"]
         assert settings.mounts == [cs.Mount(data, "/data", True), cs.Mount(data, "/data-rw", False)]
 
     def test_host_settings_tilde_key(self, isolated_home):
@@ -250,7 +261,7 @@ class TestGit:
 
 def make_plan(repo, **overrides):
     values = dict(
-        repo=repo, image="img", settings=cs.Settings(), otel=False, git_env={},
+        repo=repo, image="img", settings=cs.Settings(), devices=[], device_problems=[], otel=False, git_env={},
         tty=False, term="xterm", colorterm=None, user="1000:1000",
     )
     return cs.Plan(**(values | overrides))
@@ -306,6 +317,33 @@ class TestDockerRunArgs:
         d.mkdir()
         mounts = mounts_of(cs.docker_run_args(make_plan(cs.detect_repo(d)), ["claude"]))
         assert not any(".git" in m for m in mounts)
+
+
+class TestDevices:
+    def test_resolve(self, tmp_path):
+        regular = tmp_path / "file"
+        regular.write_text("")
+        devices, problems = cs.resolve_devices(["/dev/null", str(tmp_path / "nope"), str(regular)])
+        assert devices == [cs.Device("/dev/null", cs.os.stat("/dev/null").st_gid)]
+        assert len(problems) == 2
+        assert "ありません" in problems[0] and "キャラクタデバイスではありません" in problems[1]
+
+    def test_docker_args(self, repo_dir):
+        devices = [cs.Device("/dev/kvm", 991), cs.Device("/dev/kvm2", 991), cs.Device("/dev/net/tun", 0)]
+        args = cs.docker_run_args(make_plan(cs.detect_repo(repo_dir), devices=devices), ["bash"])
+        assert cs.device_args(devices) == [
+            "--device", "/dev/kvm", "--device", "/dev/kvm2", "--device", "/dev/net/tun",
+            "--group-add", "991", "--group-add", "0",
+        ]
+        start = args.index("--device")
+        assert args[start:start + 10] == cs.device_args(devices)
+        # 既存の制限は残る
+        for opt in (["--cap-drop", "ALL"], ["--security-opt", "no-new-privileges"], ["--user", "1000:1000"]):
+            assert args[args.index(opt[0]):][:2] == opt
+
+    def test_no_devices(self, repo_dir):
+        args = cs.docker_run_args(make_plan(cs.detect_repo(repo_dir)), ["bash"])
+        assert "--device" not in args and "--group-add" not in args
 
 
 class TestSkills:

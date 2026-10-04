@@ -37,6 +37,7 @@ claude-sandbox clean                  # このリポジトリ用のコンテナ�
 | 渡す（読み取り専用） | ホストの `~/.claude/skills` の skills を、コンテナの `~/.claude/skills/<名前>` に（リンク先の `~/.agents/skills/<名前>` をマウントする。claude.ai から同期される `synced` は除く） |
 | 渡す | OTel の設定（`langfuse/claude-otel.env`、送信先、`git.repo`）。Collector に届くときだけ |
 | 渡す | 設定ファイルの `env` と、ホスト側の設定の `mounts` |
+| 渡す | ホスト側の設定の `devices`（`--device` と、デバイスの所有グループの `--group-add`）。ホストに無いか、キャラクタデバイスでなければ、警告を出して渡さずに起動する |
 | 渡さない | ホストの `~/.claude`（認証情報と、全リポジトリの会話ログ） |
 | 渡さない | `~/.ssh`、`~/.gitconfig`、GPG 鍵（コンテナからは push も署名もできない） |
 | 渡さない | Langfuse の鍵（Collector だけが持つ） |
@@ -45,7 +46,7 @@ claude-sandbox clean                  # このリポジトリ用のコンテナ�
 
 その他の制限:
 
-- ホストの UID で動く（root ではない）。全 capability を外し、`no-new-privileges` を付ける
+- ホストの UID で動く（root ではない）。全 capability を外し、`no-new-privileges` を付ける。`devices` を渡しても変わらない（KVM は `/dev/kvm` への ioctl だけで使え、capability はいらない）
 - コンテナの `HOME` は `~/.local/state/claude-sandbox/<名前>-<ハッシュ>/`。マウントするパスごとに分かれ、会話ログや設定はここに残る
 - ネットワークは `claude_sandbox` のみ。同じネットワークにいるのは Collector だけで、Langfuse 本体のコンテナには直接届かない。ただし下の「既知の制約」を参照
 
@@ -64,7 +65,7 @@ claude-sandbox clean                  # このリポジトリ用のコンテナ�
 | ファイル | 書けるもの | 置き場所の理由 |
 |---|---|---|
 | `<リポジトリ>/.claude-sandbox.toml` | `image`、`env` | リポジトリの開発環境の一部なので、リポジトリと一緒に管理する |
-| `~/.config/claude-sandbox/config.toml` | リポジトリのパスごとに `image`、`env`、`mounts` | 追加のマウントはコンテナの外に広がる唯一の項目。リポジトリ内のファイルはコンテナ内の Claude が書き換えられる（`.git` 経由で別のブランチに仕込むこともできる）ので、ホスト側にだけ書けるようにした |
+| `~/.config/claude-sandbox/config.toml` | リポジトリのパスごとに `image`、`env`、`mounts`、`devices` | 追加のマウントとデバイスはコンテナの外に広がる項目。リポジトリ内のファイルはコンテナ内の Claude が書き換えられる（`.git` 経由で別のブランチに仕込むこともできる）ので、ホスト側にだけ書けるようにした |
 
 ```toml
 # <リポジトリ>/.claude-sandbox.toml
@@ -81,6 +82,9 @@ mounts = [
   { source = "~/datasets/foo", target = "/data" },                     # readonly の既定は true
   { source = "~/scratch", target = "/scratch", readonly = false },
 ]
+
+["~/work/private_github/ai-kernel-bench"]
+devices = ["/dev/kvm"]   # QEMU を KVM で動かす
 ```
 
 - ホスト側の設定はリポジトリの設定より優先する。イメージの優先順は `--image` > `$CLAUDE_SANDBOX_IMAGE` > ホスト側の設定 > リポジトリの設定 > `claude-sandbox`
