@@ -10,6 +10,8 @@ claude ──(鍵なし)──▶ localhost:4318 Collector ──(Basic 認証)�
 - Collector が変換する内容
   - トークン数（`input_tokens` など）→ `langfuse.observation.usage_details`。Langfuse がこれに単価をかけてコストを出す
   - `git.repo` → タグ `repo:<リポジトリ名>`。リポジトリの外で起動したときは `repo:none`
+  - ユーザーのプロンプト（`interaction` の `user_prompt`）→ Input 欄（observation とトレース）。metadata からは消す
+  - アシスタントの応答は元のデータに無いので、Output 欄は空のまま
 - Langfuse の鍵は Collector だけが持つ。claude の環境には渡らない
 
 ## セットアップ

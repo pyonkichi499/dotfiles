@@ -19,6 +19,13 @@ processors:
           - span.attributes["span.type"] == "llm_request" and span.attributes["input_tokens"] != nil
         statements:
           - set(span.attributes["langfuse.observation.usage_details"], Format("{\"input\":%d,\"output\":%d,\"cache_read_input_tokens\":%d,\"cache_creation_input_tokens\":%d}", [span.attributes["input_tokens"], span.attributes["output_tokens"], span.attributes["cache_read_tokens"], span.attributes["cache_creation_tokens"]]))
+      # ユーザーのプロンプトを metadata から Langfuse の Input 欄（observation とトレース）に移す
+      - conditions:
+          - span.attributes["span.type"] == "interaction" and span.attributes["user_prompt"] != nil
+        statements:
+          - set(span.attributes["langfuse.observation.input"], span.attributes["user_prompt"])
+          - set(span.attributes["langfuse.trace.input"], span.attributes["user_prompt"])
+          - delete_key(span.attributes, "user_prompt")
       # claude 関数が付けたリポジトリ名を、絞り込みと集計に使えるタグにする
       - conditions:
           - resource.attributes["git.repo"] != nil
