@@ -32,6 +32,7 @@ link .claude/settings.json .claude/settings.json
 link .claude/statusline.sh .claude/statusline.sh
 link ai/AGENTS.md .claude/CLAUDE.md   # AI ツール共通の指示
 link ai/AGENTS.md .codex/AGENTS.md
+link claude-sandbox/claude-sandbox .local/bin/claude-sandbox   # Docker 内で Claude Code を動かす
 
 # etc
 link .config/starship.toml .config/starship.toml

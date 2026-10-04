@@ -1,0 +1,699 @@
+#!/usr/bin/env -S uv run --quiet --script
+# /// script
+# requires-python = ">=3.12"
+# ///
+"""claude-sandbox: カレントのリポジトリを Docker コンテナにマウントし、Claude Code を
+--dangerously-skip-permissions で起動する。仕様は `claude-sandbox help`、経緯は README.md
+"""
+
+from __future__ import annotations
+
+import hashlib
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tomllib
+import urllib.error
+import urllib.request
+from dataclasses import dataclass, field
+from pathlib import Path
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+DOTFILES = SCRIPT_DIR.parent
+DEFAULT_IMAGE = "claude-sandbox"
+NETWORK = "claude_sandbox"
+COLLECTOR = "langfuse-otel-collector"
+COLLECTOR_HOST_URL = "http://localhost:4318"
+COLLECTOR_CONTAINER_URL = f"http://{COLLECTOR}:4318"
+CONTAINER_HOME = "/home/sandbox"
+MANAGED_DIR = "/etc/claude-code"
+REPO_CONFIG_NAME = ".claude-sandbox.toml"
+OTEL_ENV_FILE = DOTFILES / "langfuse" / "claude-otel.env"
+GLOBAL_INSTRUCTIONS = DOTFILES / "ai" / "AGENTS.md"
+MANAGED_SETTINGS = SCRIPT_DIR / "managed-settings.json"
+SUBCOMMANDS = ("run", "shell", "doctor", "build", "clean", "help")
+
+# claude-sandbox 自身が設定する環境変数。設定ファイルの env では上書きさせない
+RESERVED_ENV = re.compile(
+    r"HOME|TERM|COLORTERM|DISABLE_AUTOUPDATER|CLAUDE_CODE_OAUTH_TOKEN"
+    r"|CLAUDE_CODE_ENABLE_TELEMETRY|CLAUDE_CODE_ENHANCED_TELEMETRY_BETA"
+    r"|OTEL_.*|GIT_AUTHOR_.*|GIT_COMMITTER_.*"
+)
+ENV_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+
+class SandboxError(Exception):
+    pass
+
+
+def token_file() -> Path:
+    return Path.home() / ".claude-sandbox.env"
+
+
+def state_root() -> Path:
+    base = os.environ.get("XDG_STATE_HOME") or Path.home() / ".local" / "state"
+    return Path(base) / "claude-sandbox"
+
+
+def host_config_path() -> Path:
+    base = os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config"
+    return Path(base) / "claude-sandbox" / "config.toml"
+
+
+def help_text() -> str:
+    home = str(Path.home())
+
+    def short(p: Path) -> str:
+        return str(p).replace(home, "~", 1)
+
+    return f"""\
+claude-sandbox: カレントのリポジトリを Docker コンテナにマウントし、Claude Code を
+--dangerously-skip-permissions（承認なし）で起動する
+
+使い方:
+  claude-sandbox [run] [--image <イメージ>] [--dry-run] [--] [claude の引数...]
+  claude-sandbox shell [--image <イメージ>] [--dry-run]   同じ設定のコンテナで bash を起動する
+  claude-sandbox doctor [--image <イメージ>]              準備ができているかを確認する
+  claude-sandbox build [--no-cache]                     既定のイメージ（{DEFAULT_IMAGE}）をビルドする
+  claude-sandbox clean [-y]                             このリポジトリ用のコンテナの HOME を削除する
+  claude-sandbox help                                   このヘルプを表示する
+
+  run では、claude-sandbox のオプション以外の引数を claude に渡す。紛らわしいときは -- の後ろに書く
+  --dry-run: 起動せずに docker run のコマンドを表示する（トークンはファイルで渡すので表示されない）
+
+イメージ（上ほど優先）:
+  --image > 環境変数 CLAUDE_SANDBOX_IMAGE > ホスト側の設定 > リポジトリの設定 > {DEFAULT_IMAGE}
+  用途別のイメージの要件:
+    - claude が PATH にあり、どの UID からも実行できる
+    - git、curl、ca-certificates がある
+    - ENTRYPOINT が引数をそのまま実行する
+  Claude Code は Dockerfile に次のように入れる（{short(SCRIPT_DIR / "Dockerfile")} と同じ）
+    RUN HOME=/opt/claude bash -c 'curl -fsSL https://claude.ai/install.sh | bash' \\
+     && ln -s "$(readlink -f /opt/claude/.local/bin/claude)" /usr/local/bin/claude \\
+     && chmod -R a+rX /opt/claude
+    ENV DISABLE_AUTOUPDATER=1
+
+コンテナに渡すもの:
+  - リポジトリのルート（ホストと同じパス、読み書き可）。worktree なら共通の .git も
+    ただし .git/config と .git/hooks は読み取り専用（ホストで git を使ったときに、コンテナが仕込んだコードが動かないように）
+  - コンテナの HOME: {short(state_root())}/<名前>-<ハッシュ>/（リポジトリごと。会話ログや設定はここに残る）
+  - {short(token_file())} のトークン（CLAUDE_CODE_OAUTH_TOKEN）
+  - git の名前とメールアドレス（ホストの git config の値）。コンテナ内でもコミットできるが、署名はされない
+  - 共通の指示（{short(GLOBAL_INSTRUCTIONS)}）と AI の署名を入れない設定を、Claude Code の managed 設定として（読み取り専用）
+  - OTel の設定（Collector に届くときだけ。Langfuse に送る）
+渡さないもの:
+  ホストの ~/.claude、~/.ssh、~/.gitconfig、GPG 鍵、Langfuse の鍵（push と署名はホストで行う）
+
+設定ファイル（TOML）:
+  リポジトリの設定 <リポジトリ>/{REPO_CONFIG_NAME}: image と env だけ書ける
+      image = "my-image"
+      [env]
+      UV_PROJECT_ENVIRONMENT = "{CONTAINER_HOME}/.venv"
+
+  ホスト側の設定 {short(host_config_path())}: リポジトリのパスごとに image、env、mounts を書ける。リポジトリの設定より優先する
+      ["~/work/some-repo"]
+      image = "my-image"
+      mounts = [{{ source = "~/datasets/foo", target = "/data", readonly = true }}]   # readonly の既定は true
+
+  mounts をホスト側にしか書けないのは、リポジトリ内のファイルはコンテナ内の Claude が書き換えられるため
+  env には HOME、TERM、OTEL_*、GIT_AUTHOR_* など、claude-sandbox が設定する変数は書けない
+
+制限と既知の制約:
+  - ホストの UID で動く。全 capability を外し、no-new-privileges を付ける。ネットワークは {NETWORK} のみ
+  - インターネットと LAN には出られる。ホストで 0.0.0.0 に公開しているポートにも届く
+  - リポジトリ内のファイル（Makefile、package.json の scripts、入れ子の .git など）はコンテナから書き換えられる
+    ホストで実行する前に差分を確認すること
+"""
+
+
+# ---------- 引数 ----------
+
+@dataclass
+class Cli:
+    command: str
+    image: str | None = None
+    dry_run: bool = False
+    yes: bool = False
+    no_cache: bool = False
+    claude_args: list[str] = field(default_factory=list)
+
+
+_OPTIONS = {
+    "run": {"--image", "--dry-run"},
+    "shell": {"--image", "--dry-run"},
+    "doctor": {"--image"},
+    "build": {"--no-cache"},
+    "clean": {"-y", "--yes"},
+    "help": set(),
+}
+
+
+def parse_cli(argv: list[str]) -> Cli:
+    args = list(argv)
+    command = args.pop(0) if args and args[0] in SUBCOMMANDS else "run"
+    cli = Cli(command)
+    while args:
+        arg = args[0]
+        if arg == "--":
+            args.pop(0)
+            break
+        if arg in ("-h", "--help"):
+            return Cli("help")
+        name, has_value, value = arg.partition("=")
+        if name not in _OPTIONS[command]:
+            if command == "run":
+                break  # ここから先は claude の引数
+            raise SandboxError(f"{command} では {arg} を使えません（claude-sandbox help を参照）")
+        args.pop(0)
+        if name == "--image":
+            if not has_value:
+                if not args:
+                    raise SandboxError("--image にイメージ名を指定してください")
+                value = args.pop(0)
+            if not value:
+                raise SandboxError("--image にイメージ名を指定してください")
+            cli.image = value
+            continue
+        if has_value:
+            raise SandboxError(f"{name} は値をとりません")
+        if name == "--dry-run":
+            cli.dry_run = True
+        elif name == "--no-cache":
+            cli.no_cache = True
+        else:
+            cli.yes = True
+    if args and command != "run":
+        raise SandboxError(f"{command} に余分な引数があります: {shlex.join(args)}")
+    cli.claude_args = args
+    return cli
+
+
+# ---------- リポジトリ ----------
+
+def git(*args: str, cwd: Path) -> str | None:
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True)
+    return result.stdout.strip() if result.returncode == 0 else None
+
+
+def sanitize(name: str) -> str:
+    return re.sub(r"[^A-Za-z0-9._-]", "_", name)
+
+
+def is_within(path: Path, root: Path) -> bool:
+    return path == root or root in path.parents
+
+
+@dataclass
+class Repo:
+    workdir: Path
+    mount_root: Path
+    git_common_dir: Path | None
+
+    @property
+    def name(self) -> str:
+        # claude 関数（.zsh/40-tools.zsh）と同じ求め方。worktree からでも元のリポジトリ名になる
+        d = self.git_common_dir
+        if d is None:
+            return "none"
+        return sanitize(d.parent.name if d.name == ".git" else d.name.removesuffix(".git"))
+
+    @property
+    def state_dir(self) -> Path:
+        # bash 版（printf %s "$mount_root" | sha256sum）と同じ名前にして、既存の HOME を引き継ぐ
+        digest = hashlib.sha256(str(self.mount_root).encode()).hexdigest()[:8]
+        return state_root() / f"{sanitize(self.mount_root.name)}-{digest}"
+
+
+def detect_repo(workdir: Path) -> Repo:
+    top = git("rev-parse", "--show-toplevel", cwd=workdir)
+    mount_root = Path(top) if top else workdir
+    if mount_root in (Path.home(), Path("/")):
+        raise SandboxError(f"{mount_root} を丸ごとマウントすることになるので中止します。リポジトリの中で実行してください")
+    common = git("rev-parse", "--path-format=absolute", "--git-common-dir", cwd=workdir)
+    return Repo(workdir, mount_root, Path(common) if common else None)
+
+
+# ---------- 設定ファイル ----------
+
+@dataclass
+class Mount:
+    source: Path
+    target: str
+    readonly: bool = True
+
+    def arg(self) -> str:
+        spec = f"type=bind,source={self.source},target={self.target}"
+        return spec + ",readonly" if self.readonly else spec
+
+
+@dataclass
+class Settings:
+    image: str | None = None
+    env: dict[str, str] = field(default_factory=dict)
+    mounts: list[Mount] = field(default_factory=list)
+
+
+def read_toml(path: Path) -> dict:
+    try:
+        with path.open("rb") as f:
+            return tomllib.load(f)
+    except tomllib.TOMLDecodeError as e:
+        raise SandboxError(f"{path}: TOML として読めません（{e}）") from e
+
+
+def parse_settings(data: dict, origin: str, *, allow_mounts: bool) -> Settings:
+    allowed = {"image", "env", "mounts"} if allow_mounts else {"image", "env"}
+    unknown = sorted(set(data) - allowed)
+    if unknown:
+        hint = f"。mounts はホスト側の設定（{host_config_path()}）にだけ書けます" if "mounts" in unknown else ""
+        raise SandboxError(f"{origin}: 使えないキーがあります: {', '.join(unknown)}{hint}")
+
+    settings = Settings()
+    if "image" in data:
+        if not isinstance(data["image"], str) or not data["image"]:
+            raise SandboxError(f"{origin}: image は空でない文字列で書いてください")
+        settings.image = data["image"]
+
+    env = data.get("env", {})
+    if not isinstance(env, dict):
+        raise SandboxError(f"{origin}: env はテーブルで書いてください")
+    for key, value in env.items():
+        if not ENV_NAME.fullmatch(key):
+            raise SandboxError(f"{origin}: env の名前が不正です: {key}")
+        if RESERVED_ENV.fullmatch(key):
+            raise SandboxError(f"{origin}: env の {key} は claude-sandbox が設定するので書けません")
+        if not isinstance(value, str):
+            raise SandboxError(f"{origin}: env.{key} は文字列で書いてください")
+        settings.env[key] = value
+
+    mounts = data.get("mounts", [])
+    if not isinstance(mounts, list):
+        raise SandboxError(f"{origin}: mounts は配列で書いてください")
+    settings.mounts = [parse_mount(m, origin) for m in mounts]
+    return settings
+
+
+def parse_mount(entry: object, origin: str) -> Mount:
+    if not isinstance(entry, dict) or not {"source", "target"} <= set(entry) or set(entry) - {"source", "target", "readonly"}:
+        raise SandboxError(f"{origin}: mounts の要素は {{ source, target, readonly }} で書いてください: {entry!r}")
+    source, target, readonly = entry["source"], entry["target"], entry.get("readonly", True)
+    if not isinstance(source, str) or not isinstance(target, str) or not isinstance(readonly, bool):
+        raise SandboxError(f"{origin}: mounts の source と target は文字列、readonly は真偽値で書いてください")
+    src = Path(source).expanduser()
+    if not src.is_absolute():
+        raise SandboxError(f"{origin}: mounts の source は絶対パス（~ も可）で書いてください: {source}")
+    src = src.resolve()
+    if not src.exists():
+        raise SandboxError(f"{origin}: mounts の source がありません: {src}")
+    if src in (Path("/"), Path.home()):
+        raise SandboxError(f"{origin}: {src} を丸ごとマウントすることはできません")
+    if not target.startswith("/") or target == "/" or target == CONTAINER_HOME or is_within(Path(target), Path(MANAGED_DIR)):
+        raise SandboxError(f"{origin}: mounts の target に {target} は使えません")
+    for p in (str(src), target):
+        if "," in p:
+            raise SandboxError(f"{origin}: マウントするパスに , は使えません: {p}")
+    return Mount(src, target, readonly)
+
+
+def load_repo_settings(repo: Repo) -> Settings:
+    path = repo.mount_root / REPO_CONFIG_NAME
+    if not path.is_file():
+        return Settings()
+    return parse_settings(read_toml(path), str(path), allow_mounts=False)
+
+
+def load_host_settings(repo: Repo) -> Settings:
+    path = host_config_path()
+    if is_within(path.resolve(), repo.mount_root):
+        raise SandboxError(f"ホスト側の設定 {path} がマウントするリポジトリの中にあります。コンテナから書き換えられるので中止します")
+    if not path.is_file():
+        return Settings()
+    data = read_toml(path)
+    for key, section in data.items():
+        if not isinstance(section, dict):
+            raise SandboxError(f'{path}: トップレベルには ["<リポジトリのパス>"] のテーブルだけ書けます: {key}')
+        if Path(key).expanduser().resolve() == repo.mount_root:
+            return parse_settings(section, f"{path} [{key}]", allow_mounts=True)
+    return Settings()
+
+
+def resolve_image(cli_image: str | None, environ: dict[str, str], host: Settings, repo: Settings) -> tuple[str, str]:
+    candidates = [
+        (cli_image, "--image"),
+        (environ.get("CLAUDE_SANDBOX_IMAGE"), "CLAUDE_SANDBOX_IMAGE"),
+        (host.image, "ホスト側の設定"),
+        (repo.image, "リポジトリの設定"),
+    ]
+    for image, origin in candidates:
+        if image:
+            return image, origin
+    return DEFAULT_IMAGE, "既定"
+
+
+# ---------- git ----------
+
+def git_identity(workdir: Path) -> dict[str, str]:
+    env = {}
+    if name := git("config", "user.name", cwd=workdir):
+        env["GIT_AUTHOR_NAME"] = env["GIT_COMMITTER_NAME"] = name
+    if email := git("config", "user.email", cwd=workdir):
+        env["GIT_AUTHOR_EMAIL"] = env["GIT_COMMITTER_EMAIL"] = email
+    return env
+
+
+def writable_hooks_path(repo: Repo) -> Path | None:
+    """core.hooksPath がコンテナから書き換えられる場所を指していれば、そのパスを返す"""
+    value = git("config", "core.hooksPath", cwd=repo.workdir)
+    if not value:
+        return None
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = repo.mount_root / path
+    path = path.resolve()
+    writable = [repo.mount_root] + ([repo.git_common_dir] if repo.git_common_dir else [])
+    hooks = repo.git_common_dir / "hooks" if repo.git_common_dir else None
+    if path != hooks and any(is_within(path, root) for root in writable):
+        return path
+    return None
+
+
+def git_protect_mounts(repo: Repo) -> list[Mount]:
+    """ホストの git が読む .git/config と .git/hooks を読み取り専用で重ねる"""
+    d = repo.git_common_dir
+    if d is None:
+        return []
+    mounts = []
+    if (d / "config").is_file():
+        mounts.append(Mount(d / "config", str(d / "config")))
+    mounts.append(Mount(d / "hooks", str(d / "hooks")))
+    return mounts
+
+
+# ---------- docker ----------
+
+def docker_ok(*args: str) -> bool:
+    return subprocess.run(["docker", *args], capture_output=True).returncode == 0
+
+
+def collector_reachable() -> bool:
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    try:
+        opener.open(COLLECTOR_HOST_URL, timeout=1)
+    except urllib.error.HTTPError:
+        pass  # 応答があれば届いている
+    except (urllib.error.URLError, OSError):
+        return False
+    fmt = f'{{{{if index .NetworkSettings.Networks "{NETWORK}"}}}}yes{{{{end}}}}'
+    result = subprocess.run(["docker", "inspect", "-f", fmt, COLLECTOR], capture_output=True, text=True)
+    return result.stdout.strip() == "yes"
+
+
+@dataclass
+class Plan:
+    repo: Repo
+    image: str
+    settings: Settings
+    otel: bool
+    git_env: dict[str, str]
+    tty: bool
+    term: str
+    colorterm: str | None
+    user: str
+
+
+def make_plan(cli: Cli, workdir: Path) -> tuple[Plan, str]:
+    repo = detect_repo(workdir)
+    repo_settings = load_repo_settings(repo)
+    host_settings = load_host_settings(repo)
+    image, origin = resolve_image(cli.image, dict(os.environ), host_settings, repo_settings)
+    settings = Settings(
+        image=image,
+        env={**repo_settings.env, **host_settings.env},
+        mounts=host_settings.mounts,
+    )
+    plan = Plan(
+        repo=repo,
+        image=image,
+        settings=settings,
+        otel=collector_reachable(),
+        git_env=git_identity(repo.workdir),
+        tty=sys.stdin.isatty() and sys.stdout.isatty(),
+        term=os.environ.get("TERM") or "xterm-256color",
+        colorterm=os.environ.get("COLORTERM"),
+        user=f"{os.getuid()}:{os.getgid()}",
+    )
+    return plan, origin
+
+
+def docker_run_args(plan: Plan, command: list[str]) -> list[str]:
+    repo = plan.repo
+    root = str(repo.mount_root)
+    args = [
+        "docker", "run", "--rm", "--init",
+        "--network", NETWORK,
+        "--user", plan.user,
+        "--cap-drop", "ALL",
+        "--security-opt", "no-new-privileges",
+        "--mount", Mount(repo.mount_root, root, readonly=False).arg(),
+        "--mount", Mount(repo.state_dir, CONTAINER_HOME, readonly=False).arg(),
+    ]
+    # worktree では共通の .git がリポジトリの外にあるので、これも同じパスにマウントする（無いとコンテナ内で git が使えない）
+    d = repo.git_common_dir
+    if d is not None and not is_within(d, repo.mount_root):
+        args += ["--mount", Mount(d, str(d), readonly=False).arg()]
+    for m in git_protect_mounts(repo):
+        args += ["--mount", m.arg()]
+    # managed 設定はコンテナ内の Claude から書き換えも上書きもできない
+    if GLOBAL_INSTRUCTIONS.is_file():
+        args += ["--mount", Mount(GLOBAL_INSTRUCTIONS.resolve(), f"{MANAGED_DIR}/CLAUDE.md").arg()]
+    if MANAGED_SETTINGS.is_file():
+        args += ["--mount", Mount(MANAGED_SETTINGS, f"{MANAGED_DIR}/managed-settings.json").arg()]
+    for m in plan.settings.mounts:
+        args += ["--mount", m.arg()]
+
+    args += [
+        "-w", str(repo.workdir),
+        "-e", f"HOME={CONTAINER_HOME}",
+        "-e", "DISABLE_AUTOUPDATER=1",
+        "-e", f"TERM={plan.term}",
+        # トークンはファイルで渡す（コマンドラインに載せると ps で見える）
+        "--env-file", str(token_file()),
+        "--label", f"claude-sandbox.repo={repo.name}",
+        "--label", f"claude-sandbox.mount={root}",
+    ]
+    if plan.colorterm:
+        args += ["-e", f"COLORTERM={plan.colorterm}"]
+    for key, value in {**plan.settings.env, **plan.git_env}.items():
+        args += ["-e", f"{key}={value}"]
+    if plan.otel:
+        args += [
+            "--env-file", str(OTEL_ENV_FILE),
+            "-e", f"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT={COLLECTOR_CONTAINER_URL}/v1/traces",
+            "-e", f"OTEL_RESOURCE_ATTRIBUTES=git.repo={repo.name}",
+        ]
+    args.append("-it" if plan.tty else "-i")
+    return args + [plan.image, *command]
+
+
+# ---------- 事前チェック ----------
+
+def token_problem() -> str | None:
+    path = token_file()
+    if not path.is_file():
+        return f"{path} がありません。'claude setup-token' で発行したトークンを CLAUDE_CODE_OAUTH_TOKEN=... の形で書いてください"
+    if path.stat().st_mode & 0o777 != 0o600:
+        return f"{path} の権限が 600 ではありません（chmod 600 {path}）"
+    if not re.search(r"^CLAUDE_CODE_OAUTH_TOKEN=.", path.read_text(), re.MULTILINE):
+        return f"{path} に CLAUDE_CODE_OAUTH_TOKEN=... がありません"
+    return None
+
+
+def image_problem(image: str) -> str | None:
+    if docker_ok("image", "inspect", image):
+        return None
+    hint = "'claude-sandbox build' で作れます" if image == DEFAULT_IMAGE else "ビルドするか、--image で別のイメージを指定してください"
+    return f"イメージ {image} がありません。{hint}"
+
+
+def warn(message: str) -> None:
+    print(f"claude-sandbox: {message}", file=sys.stderr)
+
+
+# ---------- サブコマンド ----------
+
+def cmd_run(cli: Cli, command: list[str]) -> int:
+    if not shutil.which("docker"):
+        raise SandboxError("docker が見つかりません")
+    plan, _ = make_plan(cli, Path.cwd())
+    for problem in (token_problem(), image_problem(plan.image)):
+        if problem:
+            raise SandboxError(problem)
+    if hooks := writable_hooks_path(plan.repo):
+        warn(f"core.hooksPath（{hooks}）はコンテナから書き換えられます。ホストで git を使う前に中身を確認してください")
+    if not plan.otel:
+        warn(f"Collector に {NETWORK} から接続できないため、Langfuse へ送信せずに起動します"
+             f"（docker compose -f {DOTFILES}/langfuse/compose.yml up -d）")
+    if not plan.git_env:
+        warn("git の user.name / user.email が見つからないため、コンテナ内ではコミットできません")
+
+    args = docker_run_args(plan, command)
+    if cli.dry_run:
+        print(shlex.join(args))
+        return 0
+
+    state_dir = plan.repo.state_dir
+    state_dir.mkdir(parents=True, exist_ok=True)
+    state_root().chmod(0o700)
+    state_dir.chmod(0o700)
+    # hooks が無いとコンテナ内で作れてしまうので、先に作って読み取り専用で重ねる
+    if plan.repo.git_common_dir is not None:
+        (plan.repo.git_common_dir / "hooks").mkdir(exist_ok=True)
+    # ネットワークは compose の外で作る（compose の down で消えないように）
+    if not docker_ok("network", "inspect", NETWORK):
+        subprocess.run(["docker", "network", "create", NETWORK], check=True, stdout=subprocess.DEVNULL)
+
+    proc = subprocess.Popen(args)
+    while True:
+        try:
+            status = proc.wait()
+            break
+        except KeyboardInterrupt:
+            continue  # Ctrl-C はコンテナ側に任せ、終了を待つ
+    if status == 127:
+        raise SandboxError(f"イメージ {plan.image} に {command[0]} がありません"
+                           f"（claude なら {SCRIPT_DIR}/Dockerfile の「Claude Code」の部分をそのイメージの Dockerfile に足してください）")
+    return status
+
+
+def cmd_doctor(cli: Cli) -> int:
+    results: list[tuple[str, str]] = []
+
+    def check(ok: bool | None, label: str) -> None:
+        results.append(({True: "✓", False: "✗", None: "!"}[ok], label))
+
+    docker_version = subprocess.run(["docker", "version", "--format", "{{.Server.Version}}"],
+                                    capture_output=True, text=True) if shutil.which("docker") else None
+    docker_ready = docker_version is not None and docker_version.returncode == 0
+    check(docker_ready, f"docker: {docker_version.stdout.strip()}" if docker_ready else "docker: 見つからないか、デーモンに接続できません")
+
+    problem = token_problem()
+    check(problem is None, problem or f"トークン: {token_file()}")
+
+    try:
+        plan, origin = make_plan(cli, Path.cwd())
+    except SandboxError as e:
+        check(False, str(e))
+        return print_results(results)
+
+    repo = plan.repo
+    check(True, f"マウント: {repo.mount_root}（リポジトリ名 {repo.name}）")
+    check(True, f"コンテナの HOME: {repo.state_dir}")
+    if docker_ready:
+        problem = image_problem(plan.image)
+        if problem:
+            check(False, problem)
+        else:
+            version = subprocess.run(
+                ["docker", "run", "--rm", "--network", "none", "--user", plan.user, plan.image, "claude", "--version"],
+                capture_output=True, text=True,
+            )
+            check(version.returncode == 0,
+                  f"イメージ: {plan.image}（{origin}）、claude {version.stdout.strip()}" if version.returncode == 0
+                  else f"イメージ {plan.image}（{origin}）で claude を実行できません: {version.stderr.strip()}")
+        has_network = docker_ok("network", "inspect", NETWORK)
+        check(has_network or None, f"ネットワーク: {NETWORK}" + ("" if has_network else "（無いので起動時に作ります）"))
+    check(plan.otel or None, "Langfuse: Collector に届きます" if plan.otel
+          else f"Langfuse: Collector に届かないため送信しません（docker compose -f {DOTFILES}/langfuse/compose.yml up -d）")
+    for path, label in ((GLOBAL_INSTRUCTIONS, "共通の指示"), (MANAGED_SETTINGS, "managed settings")):
+        check(path.is_file() or None, f"{label}: {path}" + ("" if path.is_file() else " がありません"))
+    if plan.settings.env:
+        check(True, f"追加の環境変数: {', '.join(plan.settings.env)}")
+    for m in plan.settings.mounts:
+        check(True, f"追加のマウント: {m.source} → {m.target}（{'読み取り専用' if m.readonly else '読み書き可'}）")
+
+    if repo.git_common_dir is None:
+        check(None, "git: リポジトリではありません")
+    else:
+        names = plan.git_env
+        check(bool(names) or None,
+              f"git: {names.get('GIT_AUTHOR_NAME')} <{names.get('GIT_AUTHOR_EMAIL')}>（コンテナ内のコミットは署名なし）" if names
+              else "git: user.name / user.email が無いので、コンテナ内ではコミットできません")
+        if git("config", "--local", "--type=bool", "commit.gpgsign", cwd=repo.workdir) == "true":
+            check(None, "git: リポジトリの設定で commit.gpgsign が有効なので、コンテナ内のコミットは失敗します")
+        if hooks := writable_hooks_path(repo):
+            check(None, f"git: core.hooksPath（{hooks}）はコンテナから書き換えられます")
+    return print_results(results)
+
+
+def print_results(results: list[tuple[str, str]]) -> int:
+    for mark, label in results:
+        print(f"{mark} {label}")
+    return 1 if any(mark == "✗" for mark, _ in results) else 0
+
+
+def cmd_build(cli: Cli) -> int:
+    args = ["docker", "build", "-t", DEFAULT_IMAGE, *(["--no-cache"] if cli.no_cache else []), str(SCRIPT_DIR)]
+    print(f"+ {shlex.join(args)}", file=sys.stderr)
+    return subprocess.run(args).returncode
+
+
+def cmd_clean(cli: Cli) -> int:
+    repo = detect_repo(Path.cwd())
+    state_dir = repo.state_dir
+    if not state_dir.exists():
+        print(f"{state_dir} はありません")
+        return 0
+    running = subprocess.run(
+        ["docker", "ps", "-q", "--filter", f"label=claude-sandbox.mount={repo.mount_root}"],
+        capture_output=True, text=True,
+    ).stdout.strip()
+    if running:
+        raise SandboxError("このリポジトリのコンテナが動いています。終了してから実行してください")
+    if not cli.yes:
+        if not sys.stdin.isatty():
+            raise SandboxError("確認できないので中止します。削除するなら -y を付けてください")
+        answer = input(f"{state_dir} を削除します（コンテナ内の会話ログと設定が消えます）。よろしいですか？ [y/N] ")
+        if answer.strip().lower() != "y":
+            print("中止しました")
+            return 1
+
+    def make_writable(func, path, _exc):
+        # 読み取り専用のディレクトリ（Go のモジュールキャッシュなど）も消せるようにする
+        os.chmod(os.path.dirname(path), 0o700)
+        if os.path.isdir(path) and not os.path.islink(path):
+            os.chmod(path, 0o700)
+        func(path)
+
+    shutil.rmtree(state_dir, onexc=make_writable)
+    print(f"{state_dir} を削除しました")
+    return 0
+
+
+def main(argv: list[str]) -> int:
+    try:
+        cli = parse_cli(argv)
+        match cli.command:
+            case "help":
+                print(help_text(), end="")
+                return 0
+            case "run":
+                return cmd_run(cli, ["claude", "--dangerously-skip-permissions", *cli.claude_args])
+            case "shell":
+                return cmd_run(cli, ["bash"])
+            case "doctor":
+                return cmd_doctor(cli)
+            case "build":
+                return cmd_build(cli)
+            case "clean":
+                return cmd_clean(cli)
+    except SandboxError as e:
+        warn(str(e))
+        return 1
+    raise AssertionError(cli.command)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
