@@ -84,3 +84,14 @@ claude() {
     command claude "$@"
   )
 }
+
+# ccusage: claude-sandbox のコンテナの会話ログ（コンテナごとの HOME にある）も合わせて集計する
+# CLAUDE_CONFIG_DIR を自分で指定したときは、それに従う
+ccusage() {
+  if [[ -n ${CLAUDE_CONFIG_DIR:-} ]]; then
+    command ccusage "$@"
+    return
+  fi
+  local -a dirs=("$HOME/.claude" "${XDG_STATE_HOME:-$HOME/.local/state}"/claude-sandbox/*/.claude(N/))
+  CLAUDE_CONFIG_DIR=${(j:,:)dirs} command ccusage "$@"
+}
